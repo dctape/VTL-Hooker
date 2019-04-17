@@ -98,7 +98,7 @@ int main(int argc, char **argv)
             goto err;
     } 
 
-    int nb_sec = 10;
+    int nb_sec = 30;
 	printf("Sleeping  during : %d\n ", nb_sec);
 	sleep(nb_sec);
 
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 
     /* Removing bpf_program */
 	printf("Removing bpf program...\nExit\n");
-	ret = bpf_prog_detach(cgroup_fd, BPF_CGROUP_INET_EGRESS);
+	ret = bpf_prog_detach2(prog_fd,cgroup_fd, BPF_CGROUP_INET_EGRESS);
     if(ret) {
 
             printf("Failed to detach bpf program\tret = %d\n", ret);
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
     
 err:
     //cleanup_cgroup_environment();
-    close(cgroup_fd);
+    close(cgroup_fd); // La raison la plus probable pour laquelle detach ne fonctionnait pas.
 
 
 out: 
