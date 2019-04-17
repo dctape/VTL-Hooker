@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ftw.h>
+#include <mntent.h>
 
 #include "cgroup_helpers.h"
 
@@ -240,3 +241,23 @@ free_mem:
 	free(fhp);
 	return ret;
 }
+
+
+char *find_cgroup_root(void)
+{
+	struct mntent *mnt;
+	FILE *f;
+
+	f = fopen("/proc/mounts", "r");
+	if(f == NULL)
+		return NULL;
+	while ((mnt = getmntent(f))) {
+		if(strcmp(mnt->mnt_type, "cgroup2") == 0) {
+			fclose(f);
+			return strdup(mnt-> mnt_dir);
+		}
+	}
+
+	fclose(f);
+	return NULL;
+} 

@@ -14,5 +14,6 @@ int join_cgroup(const char *path);
 int setup_cgroup_environment(void);
 void cleanup_cgroup_environment(void);
 unsigned long long get_cgroup_id(const char *path);
+char *find_cgroup_root(void);
 
 #endif
