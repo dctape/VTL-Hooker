@@ -1,0 +1,12 @@
+--- hello.c	2019-04-24 14:16:16.328954215 +0200
++++ hello_new.c	2019-04-24 14:17:35.481294580 +0200
+@@ -1,6 +1,7 @@
+ #include <stdio.h>
+ 
+-int main() 
++int main(int argc, char *argv[]) 
+ {
+     printf("Hello World !\n");
++    return 0;
+ }
+\ Pas de fin de ligne à la fin du fichier
