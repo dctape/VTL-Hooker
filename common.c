@@ -1,5 +1,5 @@
 #include "common.h"
-#include <stdio.h>  // pourquoi ?
+#include <stdio.h>  
 #include <stdlib.h> 
 #include <string.h>
 #include <linux/bpf.h>
