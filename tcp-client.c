@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* création de la socket */
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1){ // pourquoi 0 en param ?
+	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
 		perror("socket");
 		exit(1);
 	}
