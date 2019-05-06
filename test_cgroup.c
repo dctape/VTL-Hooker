@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     char *cgroup_root_path;
     /* Trouver le cgroup root */
     cgroup_root_path = find_cgroup_root();
-     /* Ouverture en.... */
+     /* Ouverture en lecture seule... */
     cgroup_fd = open(cgroup_root_path, O_RDONLY);
 	if (cgroup_fd < 0) {
 		log_err("Opening Cgroup");
