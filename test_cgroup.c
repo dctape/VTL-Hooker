@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     void* program = bpf_module_create_c("cgroups.c", 0, NULL, 0, false);
     void* start = bpf_function_start (program, "cgroup");
     size_t size = bpf_function_size (program, "cgroup");
-	unsigned int kern_version = bpf_module_kern_version(program);
+    unsigned int kern_version = bpf_module_kern_version(program);
 	
 
     printf("Loading bpf program in kernel...\n");
