@@ -15,7 +15,7 @@
 //#include <sys/time.h>
 #include <unistd.h>
 
-#define PORT 8080
+#define PORT 9090
 #define SA struct sockaddr
 #define MAXDATASIZE 100
 
