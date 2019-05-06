@@ -23,10 +23,6 @@
 //#include "cgroup_helpers.h"
 
 
-
-
-
-
 //#include "common.h"
 
 #define  CGROUP_PATH            "/test_cgroup"
@@ -40,11 +36,10 @@
 
 char *find_cgroup_root(void);
 
-
 int main(int argc, char **argv)
 {   
 
-	char filename[256];
+    char filename[256];
     int status = 0;
 
     snprintf(filename, sizeof(filename), "%s_kern.o", argv[0]);
@@ -70,35 +65,35 @@ int main(int argc, char **argv)
     char *cgroup_root_path;
     /* Trouver le cgroup root */
     cgroup_root_path = find_cgroup_root();
-     /* Ouverture en.... */
+     /* Ouverture en lecture seule... */
     int cgroup_fd = open(cgroup_root_path, O_RDONLY);
-	if (cgroup_fd < 0) {
-		log_err("Opening Cgroup");
+    if (cgroup_fd < 0) {
+	log_err("Opening root cgroup");
         status = -1;
-		goto out;
-	}
+	goto out;
+    }
   
 
     /* Attach the bpf program */
 
     printf("Attaching bpf program...\n");
     int ret = bpf_prog_attach(prog_fd[0], cgroup_fd, BPF_CGROUP_INET_EGRESS, BPF_F_ALLOW_MULTI);
-	if(ret) {
+    if(ret) {
 
-            printf("Failed to attach bpf program\tret = %d\n", ret);
-            perror("bpf_prog_attach");
-            status = -1;
-            goto err;
+          printf("Failed to attach bpf program\tret = %d\n", ret);
+          perror("bpf_prog_attach");
+          status = -1;
+          goto err;
     } 
 
     int nb_sec = 30;
-	printf("Sleeping  during : %d\n ", nb_sec);
-	sleep(nb_sec);
+    printf("Sleeping  during : %d\n ", nb_sec);
+    sleep(nb_sec);
 
 
     /* Removing bpf_program */
-	printf("Removing bpf program...\nExit\n");
-	ret = bpf_prog_detach2(prog_fd[0], cgroup_fd, BPF_CGROUP_INET_EGRESS);
+    printf("Removing bpf program...\nExit\n");
+    ret = bpf_prog_detach2(prog_fd[0], cgroup_fd, BPF_CGROUP_INET_EGRESS);
     if(ret) {
 
             printf("Failed to detach bpf program\tret = %d\n", ret);
