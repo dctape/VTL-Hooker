@@ -81,26 +81,25 @@ int main(int argc, char **argv)
     cgroup_root_path = find_cgroup_root();
      /* Ouverture en lecture seule... */
     cgroup_fd = open(cgroup_root_path, O_RDONLY);
-	if (cgroup_fd < 0) {
-		log_err("Opening root cgroup");
-		return -1;
-	}
+    if (cgroup_fd < 0) {
+	log_err("Opening root cgroup");
+	return -1;
+    }
   
 
     /* Attach the bpf program */
     int ret;
     printf("Attaching bpf program...\n");
     ret = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_INET_EGRESS, BPF_F_ALLOW_MULTI);
-	if(ret) {
-
-            printf("Failed to attach bpf program\tret = %d\n", ret);
-            perror("bpf_prog_attach");
-            goto err;
+    if(ret) {
+         printf("Failed to attach bpf program\tret = %d\n", ret);
+         perror("bpf_prog_attach");
+         goto err;
     } 
 
     int nb_sec = 30;
-	printf("Sleeping  during : %d\n ", nb_sec);
-	sleep(nb_sec);
+    printf("Sleeping  during : %d\n ", nb_sec);
+    sleep(nb_sec);
 
     /* ping */
     /*int sockfd; 
@@ -133,13 +132,13 @@ int main(int argc, char **argv)
 
 
     /* Removing bpf_program */
-	printf("Removing bpf program...\nExit\n");
-	ret = bpf_prog_detach2(prog_fd,cgroup_fd, BPF_CGROUP_INET_EGRESS);
+    printf("Removing bpf program...\nExit\n");
+    ret = bpf_prog_detach2(prog_fd,cgroup_fd, BPF_CGROUP_INET_EGRESS);
     if(ret) {
 
-            printf("Failed to detach bpf program\tret = %d\n", ret);
-            perror("bpf_prog_attach");
-            goto err;
+          printf("Failed to detach bpf program\tret = %d\n", ret);
+          perror("bpf_prog_attach");
+          goto err;
     } 
 
     
