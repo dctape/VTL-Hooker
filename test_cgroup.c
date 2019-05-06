@@ -82,7 +82,7 @@ int main(int argc, char **argv)
      /* Ouverture en lecture seule... */
     cgroup_fd = open(cgroup_root_path, O_RDONLY);
 	if (cgroup_fd < 0) {
-		log_err("Opening Cgroup");
+		log_err("Opening root cgroup");
 		return -1;
 	}
   
