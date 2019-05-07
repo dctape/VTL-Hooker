@@ -17,4 +17,4 @@ Execution :
 - git clone
 - cd Hooker/
 - sudo make
-- par la suite tu exécutes (tu verras dans le makefile les cibles sous le nom de TARGET, que tu pourrais exécuter)
+- par la suite tu exécutes (tu verras dans le makefile les cibles sous le nom de TARGET, que tu pourrais exécuter) en mode sudo.
