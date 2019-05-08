@@ -1,6 +1,6 @@
 
-#include <uapi/linux/bpf.h>
-//#include <linux/bpf.h>
+//#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include "bpf_helpers.h"
 #include "bpf_endian.h"
 
@@ -21,7 +21,7 @@ struct sock_key{
     __u32 sport;
     __u32 dport;
 
-} __attribute__((packed));
+} ;
 
 
 /* map compteur de socket mis dans la sockmap */
@@ -35,6 +35,13 @@ struct bpf_map_def SEC("maps") counter = {
 struct bpf_map_def SEC("maps") sockhash= {
 	.type = BPF_MAP_TYPE_SOCKHASH,
 	.key_size = sizeof(struct sock_key),
+	.value_size = sizeof(int),
+	.max_entries = 20,
+};
+
+struct bpf_map_def SEC("maps") sockhash2= {
+	.type = BPF_MAP_TYPE_SOCKHASH,
+    .key_size = sizeof(int),
 	.value_size = sizeof(int),
 	.max_entries = 20,
 };
@@ -98,11 +105,16 @@ int bpf_sockops(struct bpf_sock_ops *skops)
 
 
 /*msg redirection */
-/*SEC("sk_msg")
+SEC("sk_msg")
 int bpf_redir(struct sk_msg_md *msg)
 {
+    __u64 flags = BPF_F_INGRESS;
+    struct sock_key redir_key = {};
 
-} */
+    /* redirection de l'application legacy vers le hooker userspace */
+    bpf_msg_redirect_hash(msg, &sockhash, &redir_key, flags);
+    return SK_PASS;
+} 
 
 
 
