@@ -59,6 +59,8 @@ void h_extract_key(struct bpf_sock_ops *skops, struct sock_key *key)
     key->sport = bpf_ntohl(skops->local_port) ;
 }
 
+//efbonfoh :  je ne vois pas l'intérêt de séparer les deux fonctions (dessus - dessous)
+
 /* Extraire la clé de la socket puis l'ajoute à la sockmap */
 static __always_inline 
 void h_add_hmap(struct bpf_sock_ops *skops)
@@ -113,6 +115,8 @@ int bpf_sockops(struct bpf_sock_ops *skops)
     return 0;
 }
 
+// efbonfoh : j'ai dit dans le papier qu'on ajoutait un "extra field" pour gérer les "multithreads" avant cette redirection.
+// Je ne vois pas la fonction push() ou le code s'y substituant, je cherche...
 
 /*msg redirection */
 SEC("sk_msg")

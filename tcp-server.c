@@ -33,7 +33,8 @@ void app(int sockfd)
 		}
         buffer[numbytes] = '\0';
 
-        /* affichage du message du client */
+        /* affichage du message du client */  // efbonfoh : au lieu d'un simple, ouvrir un fichier en écriture et y écrire 
+					      // les données reçues de façon à les sauvegarder
         printf("Client : %sServeur :", buffer);
         bzero(buffer, sizeof(buffer));
         n = 0;

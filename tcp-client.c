@@ -28,7 +28,7 @@ void app(int sockfd)
 		bzero(buffer, sizeof(buffer));
 		n  = 0;
 		printf("Client : ");
-		while((buffer[n++] = getchar()) != '\n')
+		while((buffer[n++] = getchar()) != '\n') // efbonfoh : ouvrir un fichier lambda et en envoyé le contenu.
 		;
 		if (send(sockfd, buffer, strlen(buffer), 0) == -1){
 			perror("send ");
