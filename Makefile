@@ -10,6 +10,9 @@
 TARGETS := sockops
 TARGETS += xdp_l4_count
 
+TEST := tcp-server
+TEST += tcp-client
+
 # Linking with libbpf and libpcap
 # TARGETS_PCAP += xdp_tcpdump
 
@@ -112,7 +115,7 @@ CLANG_FLAGS = -I. -I$(KDIR)/arch/$(ARCH)/include \
 
 EXTRA_CFLAGS=-Werror
 
-all: dependencies $(TARGETS_ALL) $(KERN_OBJECTS)
+all: $(TEST) dependencies $(TARGETS_ALL) $(KERN_OBJECTS)
 
 .PHONY: dependencies clean verify_cmds verify_llvm_target_bpf $(CLANG) $(LLC)
 
@@ -183,6 +186,7 @@ LIBBPF_SOURCES  = $(TOOLS_PATH)/lib/bpf/*.c
 $(LIBBPF): $(LIBBPF_SOURCES) $(TOOLS_PATH)/lib/bpf/Makefile
 	make -C $(TOOLS_PATH)/lib/bpf/ all
 
+#LPTHREAD = -lpthread
 ##LIBBPF += $(TOOLS_PATH)/lib/libbpf/src/*.o
 
 # Compiling of eBPF restricted-C code with LLVM
@@ -200,7 +204,10 @@ $(KERN_OBJECTS): %.o : %.c bpf_helpers.h Makefile
 
 
 $(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile bpf_util.h
-	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF)
+	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF) -lpthread
+
+$(TEST): %: %.o 
+	$(CC) $(CFLAGS) $+ -o '$@'
 
 # Targets that links with libpcap
 # $(TARGETS_PCAP): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile bpf_util.h

@@ -16,7 +16,8 @@
 
 #define SA struct sockaddr 
 #define MAXDATASIZE 100
-#define PORT 8080
+#define PORT 9090
+char *dest_addr = "0.0.0.0";
 
 void app(int sockfd)
 {
@@ -56,13 +57,13 @@ int main(int argc, char *argv[])
 	struct hostent *hostinfo = NULL;
 	struct sockaddr_in servaddr; /* connector's address information */
 
-	const char *addr = argv[1];
+	/*const char *addr = argv[1];
 
 	if (argc != 2){
 		fprintf(stderr, "usage : ??");
 		exit(1);
-	}
-	if((hostinfo = gethostbyname(argv[1])) == NULL){
+	} */
+	if((hostinfo = gethostbyname(dest_addr)) == NULL){
 		herror("gethostbyname");
 	}
 
@@ -74,7 +75,7 @@ int main(int argc, char *argv[])
 
 	/* remplir avec les infos d'adressage du serveur */
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_addr.s_addr = inet_addr(addr);
+	servaddr.sin_addr.s_addr = inet_addr(dest_addr);
 	servaddr.sin_port = htons(PORT);
 
 

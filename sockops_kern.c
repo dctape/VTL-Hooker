@@ -4,7 +4,10 @@
 #include "bpf_helpers.h"
 #include "bpf_endian.h"
 
+
 #define SOCKOPS_MAP_SIZE            20 // augmenter jusqu'à 65535
+#define H_PORT                      10002
+#define S_PORT                      9090
 
 #define bpf_printk(fmt, ...)					\
 ({								\
@@ -12,6 +15,11 @@
 	       bpf_trace_printk(____fmt, sizeof(____fmt),	\
 				##__VA_ARGS__);			\
 }) 
+
+#ifndef memcpy
+# define memcpy(dest, src, n)   __builtin_memcpy((dest), (src), (n))
+#endif
+
 
 /*structure clé socket */
 struct sock_key{
@@ -21,34 +29,28 @@ struct sock_key{
     __u32 sport;
     __u32 dport;
 
-} ;
+};//__attribute__((packed)) ; // ne pas oublier packed
 
 
 /* map compteur de socket mis dans la sockmap */
-struct bpf_map_def SEC("maps") counter = {
+struct bpf_map_def SEC("maps") tx = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(int),
-    .value_size = sizeof(int),
+    .value_size = sizeof(struct sock_key),
     .max_entries = 1,
 };
 
-struct bpf_map_def SEC("maps") sockhash= {
+struct bpf_map_def SEC("maps") hmap = {
 	.type = BPF_MAP_TYPE_SOCKHASH,
 	.key_size = sizeof(struct sock_key),
 	.value_size = sizeof(int),
 	.max_entries = 20,
 };
 
-struct bpf_map_def SEC("maps") sockhash2= {
-	.type = BPF_MAP_TYPE_SOCKHASH,
-    .key_size = sizeof(int),
-	.value_size = sizeof(int),
-	.max_entries = 20,
-};
 
 /* Extraire la clé d'une socket */
 static __always_inline 
-void sk_extract_key(struct bpf_sock_ops *skops, struct sock_key *key)
+void h_extract_key(struct bpf_sock_ops *skops, struct sock_key *key)
 {
     key->dip4 = skops->remote_ip4;
     key->sip4 = skops->local_ip4;
@@ -59,12 +61,20 @@ void sk_extract_key(struct bpf_sock_ops *skops, struct sock_key *key)
 
 /* Extraire la clé de la socket puis l'ajoute à la sockmap */
 static __always_inline 
-void sk_add_map(struct bpf_sock_ops *skops)
+void h_add_hmap(struct bpf_sock_ops *skops)
 {
-    struct sock_key key = {};
+    struct sock_key key = {}; 
+    struct sock_key skey = {};  
+    int tx_key = 0;
+
+    h_extract_key(skops, &key);
     
-    sk_extract_key(skops, &key);
-    bpf_sock_hash_update(skops, &sockhash, &key, BPF_NOEXIST);
+    if(key.sport == S_PORT) {
+        skey = key;
+        bpf_map_update_elem(&tx, &tx_key,&skey, BPF_ANY);
+    }
+        
+    bpf_sock_hash_update(skops, &hmap, &key, BPF_NOEXIST);
 }
 
 SEC("sockops")
@@ -84,13 +94,13 @@ int bpf_sockops(struct bpf_sock_ops *skops)
 
                /* bpf_printk("ajout d'une socket %i dans la sockmap !\n",
                     skops->local_port); */
-                sk_add_map(skops);
-                value = bpf_map_lookup_elem(&counter, &key);
+                h_add_hmap(skops);
+               /* value = bpf_map_lookup_elem(&counter, &key);
                 if(value) {
                     *value += 1; 
                     bpf_printk("ajout d'une socket %i dans la sockmap !\n",
                     skops->local_port);
-                }
+                } */
                        
             
             break;
@@ -109,10 +119,45 @@ SEC("sk_msg")
 int bpf_redir(struct sk_msg_md *msg)
 {
     __u64 flags = BPF_F_INGRESS;
-    struct sock_key redir_key = {};
+    __u32 lport, rport;
 
-    /* redirection de l'application legacy vers le hooker userspace */
-    bpf_msg_redirect_hash(msg, &sockhash, &redir_key, flags);
+    struct sock_key hsock_key = {};
+    
+    
+    lport = msg->local_port;
+    if(lport == H_PORT){
+    
+        /*struct sock_key msg_key = {};
+        msg_key.dip4 = msg->remote_ip4;
+        msg_key.sip4 = msg->local_ip4;
+        msg_key.dport = msg->remote_port;
+        msg_key.sport =  bpf_ntohl(msg->local_port);
+
+        bpf_map_lookup_elem(&hmap, &msg_key); */
+        int tx_key = 0;
+        struct sock_key *value = NULL;
+        struct sock_key skey = {};
+        value = bpf_map_lookup_elem(&tx, &tx_key);
+        skey = *value;
+        bpf_msg_redirect_hash(msg, &hmap, &skey, flags);
+    }
+    else {
+        bpf_msg_redirect_hash(msg, &hmap, &hsock_key, flags);
+    }
+    
+
+
+
+
+    
+
+   // __u32 start = 0;
+    ///int len = sizeof(struct sock_key);
+    //int len = 10;
+
+    //bpf_msg_push_data(msg, start, len, 0);
+    //memcpy(msg->data, &hsock_key, len);
+
     return SK_PASS;
 } 
 
