@@ -57,10 +57,10 @@ struct sockaddr_in to;
 
 struct sock_key{
 
-    __u32 sip4;
-    __u32 dip4;
+   // __u32 sip4;
+   // __u32 dip4;
     __u32 sport;
-    __u32 dport;
+   // __u32 dport;
 
 } ;
 
@@ -316,14 +316,14 @@ int main(int argc, char*argv[])
 	}
 
     /* Initialisation de la map de comptage */
-    __u32 key = 0;
+    /*__u32 key = 0;
     long value = 0;
     int cnt_map = map_fd[0];
     if(bpf_map_update_elem(cnt_map, &key, &value, BPF_ANY) != 0){
         printf("update  cnt_map failed\n");
         status = -1;
         goto close; 
-    }
+    } */
 
     /* ajout de la socket de redirection à la sockhash */
     struct sock_key hsock_key = {};

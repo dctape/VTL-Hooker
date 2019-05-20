@@ -24,10 +24,10 @@
 /*structure clé socket */
 struct sock_key{
 
-    __u32 sip4;
-    __u32 dip4;
+    //__u32 sip4;
+    //__u32 dip4;
     __u32 sport;
-    __u32 dport;
+    //__u32 dport;
 
 };//__attribute__((packed)) ; // ne pas oublier packed
 
@@ -52,10 +52,10 @@ struct bpf_map_def SEC("maps") hmap = {
 static __always_inline 
 void h_extract_key(struct bpf_sock_ops *skops, struct sock_key *key)
 {
-    key->dip4 = skops->remote_ip4;
-    key->sip4 = skops->local_ip4;
+    //key->dip4 = skops->remote_ip4;
+    //key->sip4 = skops->local_ip4;
 
-    key->dport = skops->remote_port ; //  >> 16 à revoir
+    //key->dport = skops->remote_port ; //  >> 16 à revoir
     key->sport = bpf_ntohl(skops->local_port) ;
 }
 
@@ -71,10 +71,10 @@ void h_add_hmap(struct bpf_sock_ops *skops)
 
     h_extract_key(skops, &key);
     
-    if(key.sport == S_PORT) {
+    /*if(key.sport == S_PORT) {
         skey = key;
         bpf_map_update_elem(&tx, &tx_key,&skey, BPF_ANY);
-    }
+    } */
         
     bpf_sock_hash_update(skops, &hmap, &key, BPF_NOEXIST);
 }
@@ -141,8 +141,9 @@ int bpf_redir(struct sk_msg_md *msg)
         int tx_key = 0;
         struct sock_key *value = NULL;
         struct sock_key skey = {};
-        value = bpf_map_lookup_elem(&tx, &tx_key);
-        skey = *value;
+        skey.sport = S_PORT;
+        /*value = bpf_map_lookup_elem(&tx, &tx_key);
+        skey = *value; */
         bpf_msg_redirect_hash(msg, &hmap, &skey, flags);
     }
     else {
