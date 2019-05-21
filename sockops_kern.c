@@ -5,41 +5,55 @@
 #include "bpf_endian.h"
 
 
-#define SOCKOPS_MAP_SIZE            20 // augmenter jusqu'à 65535
+#define SOCKOPS_MAP_SIZE            20
 #define H_PORT                      10002
 #define S_PORT                      9090
 
-#define bpf_printk(fmt, ...)					\
-({								\
-	       char ____fmt[] = fmt;				\
-	       bpf_trace_printk(____fmt, sizeof(____fmt),	\
-				##__VA_ARGS__);			\
-}) 
 
+// definition of memcpy
 #ifndef memcpy
 # define memcpy(dest, src, n)   __builtin_memcpy((dest), (src), (n))
 #endif
 
 
-/*structure clé socket */
+#define HASH_SIZE   20
+
+
+#define hash_sock(skey) ( \
+( (skey.sport & 0xff) | ((skey.dport & 0xff) << 8) | \
+  ((skey.sip4 & 0xff) << 16) | ((skey.dip4 & 0xff) << 24) \
+) % HASH_SIZE) 
+
 struct sock_key{
 
-    //__u32 sip4;
-    //__u32 dip4;
+    __u32 sip4;
+    __u32 dip4;
     __u32 sport;
-    //__u32 dport;
+    __u32 dport;
 
-};//__attribute__((packed)) ; // ne pas oublier packed
+}__attribute__((packed));
 
 
-/* map compteur de socket mis dans la sockmap */
-struct bpf_map_def SEC("maps") tx = {
-    .type = BPF_MAP_TYPE_HASH,
+// map de passage de valeur
+
+struct bpf_map_def SEC("maps") tx_id = {
+    .type = BPF_MAP_TYPE_ARRAY,
     .key_size = sizeof(int),
-    .value_size = sizeof(struct sock_key),
+    .value_size = sizeof(int), // id
     .max_entries = 1,
 };
 
+
+// map de mapping id <----> sock_key
+
+struct bpf_map_def SEC("maps") mapping = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(int),                // id
+    .value_size = sizeof(struct sock_key),  // sock_key
+    .max_entries = 20,
+};
+
+// map de redirection
 struct bpf_map_def SEC("maps") hmap = {
 	.type = BPF_MAP_TYPE_SOCKHASH,
 	.key_size = sizeof(struct sock_key),
@@ -48,121 +62,109 @@ struct bpf_map_def SEC("maps") hmap = {
 };
 
 
-/* Extraire la clé d'une socket */
-static __always_inline 
-void h_extract_key(struct bpf_sock_ops *skops, struct sock_key *key)
-{
-    //key->dip4 = skops->remote_ip4;
-    //key->sip4 = skops->local_ip4;
 
-    //key->dport = skops->remote_port ; //  >> 16 à revoir
-    key->sport = bpf_ntohl(skops->local_port) ;
-}
-
-//efbonfoh :  je ne vois pas l'intérêt de séparer les deux fonctions (dessus - dessous)
-
-/* Extraire la clé de la socket puis l'ajoute à la sockmap */
-static __always_inline 
 void h_add_hmap(struct bpf_sock_ops *skops)
 {
-    struct sock_key key = {}; 
-    struct sock_key skey = {};  
-    int tx_key = 0;
+    struct sock_key skey = {};
+    int tx_key, tx_value,cnt_key = 0 , id;   
 
-    h_extract_key(skops, &key);
+    skey.dip4 = skops->remote_ip4;
+    skey.sip4 = skops->local_ip4;
+    skey.dport = skops->remote_port ; 
+    skey.sport = bpf_ntohl(skops->local_port) ;
     
-    /*if(key.sport == S_PORT) {
-        skey = key;
-        bpf_map_update_elem(&tx, &tx_key,&skey, BPF_ANY);
-    } */
-        
-    bpf_sock_hash_update(skops, &hmap, &key, BPF_NOEXIST);
+    // get id for skey
+
+    id = hash_sock(skey);
+
+    // on récupère le compteur
+    //id = bpf_map_lookup_elem(&counter, &cnt_key);  // plus besoin
+
+    bpf_map_update_elem(&mapping, &id, &skey, BPF_ANY);      
+    bpf_sock_hash_update(skops, &hmap, &skey, BPF_NOEXIST);
+
 }
 
+
 SEC("sockops")
-int bpf_sockops(struct bpf_sock_ops *skops)
+int msg_redirector_prog1(struct bpf_sock_ops *skops)
 {
-    __u32 family; 
-    //int op = (int)skops->op;
+  
     int key = 0;
     int *value;
-    __u32 op = skops->op;
+    __u32 family, op = skops->op;
 
-    /* surveillance des connexions socket TCP| uniquement TCP... */
     switch(op){
 
         case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
         case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
 
-               /* bpf_printk("ajout d'une socket %i dans la sockmap !\n",
-                    skops->local_port); */
                 h_add_hmap(skops);
-               /* value = bpf_map_lookup_elem(&counter, &key);
-                if(value) {
-                    *value += 1; 
-                    bpf_printk("ajout d'une socket %i dans la sockmap !\n",
-                    skops->local_port);
-                } */
-                       
-            
+
             break;
         default:
             break;
     } 
 
-   
-
     return 0;
 }
 
-// efbonfoh : j'ai dit dans le papier qu'on ajoutait un "extra field" pour gérer les "multithreads" avant cette redirection.
-// Je ne vois pas la fonction push() ou le code s'y substituant, je cherche...
-
-/*msg redirection */
+// 1 sk_msg pour msg redirector
 SEC("sk_msg")
-int bpf_redir(struct sk_msg_md *msg)
+int msg_redirector_prog2(struct sk_msg_md *msg)
 {
     __u64 flags = BPF_F_INGRESS;
     __u32 lport, rport;
-
     struct sock_key hsock_key = {};
+    struct sock_key skey = {};
+    
+    int tx_key = 0;
+
     
     
     lport = msg->local_port;
+    // comparaison au niveau du port
     if(lport == H_PORT){
-    
-        /*struct sock_key msg_key = {};
-        msg_key.dip4 = msg->remote_ip4;
-        msg_key.sip4 = msg->local_ip4;
-        msg_key.dport = msg->remote_port;
-        msg_key.sport =  bpf_ntohl(msg->local_port);
+        
+        // hooker userspace -> app
+        struct sock_key *value ;
+        int *val_id;
+        int id;
+        
+        // retrieve id app
+        val_id = bpf_map_lookup_elem(&tx_id, &tx_key);
+        if(!val_id)
+            return SK_DROP;
+        id = *val_id;
+        // retrieve sock_key app
+        value = bpf_map_lookup_elem(&mapping, &id);
+        if(!value)
+            return SK_DROP;
+        skey = *value;
 
-        bpf_map_lookup_elem(&hmap, &msg_key); */
-        int tx_key = 0;
-        struct sock_key *value = NULL;
-        struct sock_key skey = {};
-        skey.sport = S_PORT;
-        /*value = bpf_map_lookup_elem(&tx, &tx_key);
-        skey = *value; */
+        // redirect to appstruct sock_key skey = {};
         bpf_msg_redirect_hash(msg, &hmap, &skey, flags);
     }
     else {
+        // app -> hooker userspace
+
+        // get msg sock_key
+        skey.dip4 = msg->remote_ip4;
+        skey.sip4 = msg->local_ip4;
+        skey.dport = msg->remote_port ; 
+        skey.sport = bpf_ntohl(msg->local_port); //est-ce que cela ne sera pas problématique ?
+
+        // retrieve id app
+        int id;
+        id = hash_sock(skey);
+
+        // give id to hooker
+        bpf_map_update_elem(&tx_id, &tx_key, &id, BPF_EXIST); // for userspace mapping
+
+        // redirect to hooker  
         bpf_msg_redirect_hash(msg, &hmap, &hsock_key, flags);
     }
     
-
-
-
-
-    
-
-   // __u32 start = 0;
-    ///int len = sizeof(struct sock_key);
-    //int len = 10;
-
-    //bpf_msg_push_data(msg, start, len, 0);
-    //memcpy(msg->data, &hsock_key, len);
-
     return SK_PASS;
 } 
 

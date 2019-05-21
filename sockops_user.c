@@ -1,25 +1,20 @@
 /* 
  *
- * Code dans l'espace utilisateur de sockops
+ * hooker userspace
  * 
 */ 
-
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdarg.h>
 #include <mntent.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <sys/syscall.h>
 #include <stdbool.h>
 #include <signal.h>
-#include <sys/resource.h>
-#include <linux/bpf.h>
+#include <fcntl.h>
+#include <errno.h>
 
-// gestion de thread
 #include <semaphore.h>
 #include <pthread.h>
 #include <mqueue.h>
@@ -31,17 +26,20 @@
 #include <netdb.h>
 
 #include <sys/ioctl.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
-//#include <bpf/bpf.h> // à revoir !!!
+#include <linux/bpf.h>
 #include "bpf_load.h"
 #include "libbpf.h"
 
 
-#define  CGROUP_PATH            "/test_cgroup"
-#define clean_errno() (errno == 0 ? "None" : strerror(errno))
-#define log_err(MSG, ...) fprintf(stderr, "(%s:%d: errno: %s) " MSG "\n", \
-	__FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
+#define HOOKER_BPF_FILENAME        "sockops_kern.o"
 
+
+#define  CGROUP_PATH            "/test_cgroup"
 #define MAXDATASIZE 100
 #define SA struct sockaddr
 #define PORT 8080
@@ -49,20 +47,315 @@
 #define S2_PORT 10001
 #define H_PORT 10002
 
+#define clean_errno() (errno == 0 ? "None" : strerror(errno))
+#define log_err(MSG, ...) fprintf(stderr, "(%s:%d: errno: %s) " MSG "\n", \
+	__FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
+
+
+
+#define HASH_SIZE   20
+
+
+#define hash_sock(skey) ( \
+( (skey.sport & 0xff) | ((skey.dport & 0xff) << 8) | \
+  ((skey.sip4 & 0xff) << 16) | ((skey.dip4 & 0xff) << 24) \
+) % HASH_SIZE)
+
+
+
 /* globals */
 int cg_fd;
 int hserv, hsock, hacpt, hsockUDP;
-char *serv_addr = "192.168.130.137";
+char *serv_addr = "121.0.0.1";
 struct sockaddr_in to;
+
+//maps
+int txid_map, mapping_map, hmap;
+
+
 
 struct sock_key{
 
-   // __u32 sip4;
-   // __u32 dip4;
+    __u32 sip4;
+    __u32 dip4;
     __u32 sport;
-   // __u32 dport;
+    __u32 dport;
 
+};
+
+struct hk_frag {
+
+    struct sock_key skey;
+    void *payload;
 } ;
+
+
+int h_init_sockets(void)
+{
+ 
+    int err, one;
+    struct sockaddr_in addr;
+
+    // create redirection socket
+    if((hserv= socket(AF_INET, SOCK_STREAM, 0)) == -1){
+		perror("socket server failed");
+        return errno;
+	}
+
+    if((hsock = socket(AF_INET, SOCK_STREAM, 0)) == -1){
+		perror("socket hooker failed");
+        return errno;
+	}
+
+    // Allow reuse
+    err = setsockopt(hserv, SOL_SOCKET, SO_REUSEADDR,
+                        (char *)&one, sizeof(one));
+    if(err) {
+        perror("setsockopt server failed");
+        return errno;
+    }
+
+    // Non-blocking sockets
+    err = ioctl(hserv, FIONBIO, (char*)&one); 
+    if (err < 0)
+    {
+            perror("ioctl server failed");
+            return errno;
+    }
+
+    // Bind server socket
+    memset(&addr, 0, sizeof(struct sockaddr_in));
+    addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    addr.sin_port = htons(S1_PORT);
+	err = bind(hserv, (struct sockaddr *)&addr, sizeof(addr));
+	if (err < 0) {
+		perror("bind server failed()\n");
+		return errno;
+	}
+    
+    // listen server socket
+    addr.sin_port = htons(S1_PORT);
+	err = listen(hserv, 32);
+	if (err < 0) {
+		perror("listen server failed()\n");
+		return errno;
+	}   
+
+
+    //socket client
+
+    // Bind hsock
+    struct sockaddr_in caddr;
+    memset(&caddr, 0, sizeof(struct sockaddr_in));
+    caddr.sin_family = AF_INET;
+	caddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    caddr.sin_port = htons(H_PORT);
+	err = bind(hsock, (struct sockaddr *)&caddr, sizeof(caddr));
+	if (err < 0) {
+		perror("bind socket failed()\n");
+		return errno;
+	}
+
+    // Initiate Connect 
+	addr.sin_port = htons(S1_PORT);
+	err = connect(hsock, (struct sockaddr *)&addr, sizeof(addr));
+	if (err < 0 && errno != EINPROGRESS) {
+		perror("connect socket client failed()\n");
+		return errno;
+	}
+
+    // accept connection
+    hacpt = accept(hserv, NULL, NULL);
+	if (hacpt < 0) {
+		perror("accept server failed()\n");
+		return errno;
+	}
+
+
+    // socket UDP for sending and receiving
+
+    hsockUDP = socket(AF_INET, SOCK_DGRAM, 0);
+    if(hsockUDP < 0) {
+        perror("creation socket UDP failed!");
+        return errno;
+    }
+
+    // Bind socket UDP , for, server or socket
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(S2_PORT);
+    err = bind(hsockUDP, (struct sockaddr *)&addr, sizeof(addr));
+	if (err < 0) {
+		perror("bind socket UDP failed()\n");
+		return errno;
+	}
+
+    // Fill destination information (app legacy)
+    to.sin_family = AF_INET;
+    to.sin_port = htons(S2_PORT);
+    to.sin_addr.s_addr = inet_addr(serv_addr);
+
+    
+    return 0;
+}
+
+int h_listen_app(void)
+{
+    char buffer[MAXDATASIZE];
+    char *send_buff;
+    int ret;
+    int id_key = 0, id;
+    struct sock_key skey = {};
+    struct hk_frag frag = {};
+    while(1){
+            bzero(buffer, sizeof(buffer));
+            if((ret = recv(hsock, buffer, MAXDATASIZE, 0)) == -1){
+                    perror("recv");
+                    return -1;
+            }
+            printf("message rédirigé: %s", buffer);
+            
+            // retrieve id sock
+            if((ret = bpf_map_lookup_elem(txid_map, &id_key, &id)) < 0){
+                printf("get id sock failed\n");
+                return -1;
+            }
+
+            // get hooker header <=> sock key
+            ret = bpf_map_lookup_elem(mapping_map, &id, &skey);
+            if(ret < 0)
+            {
+                printf("get skey failed\n");
+                return -1;
+            }
+
+            // build hooker fragment
+            frag.skey = skey;
+            frag.payload = buffer;
+
+            // convert to string for sending purpose. NB: byte order issues possible ??
+            send_buff = (char *)malloc(sizeof(frag));
+            memcpy(send_buff, (struct hk_frag *)send_buff, sizeof(struct hk_frag));
+
+            //send
+            if((ret = sendto(hsockUDP, send_buff, strlen(send_buff), 0, 
+                    (const struct sockaddr *) &to, sizeof(to))) < 0 ) {
+
+                        perror("sendto()");
+                        return errno;
+
+            }
+    }
+    
+           
+    return 0;
+
+}
+
+char *
+concat (const char *str, ...) // appel à free sur le résultat.
+{
+  va_list ap;
+  size_t allocated = 100;
+  char *result = (char *) malloc (allocated);
+
+  if (result != NULL)
+    {
+      char *newp;
+      char *wp;
+      const char *s;
+
+      va_start (ap, str);
+
+      wp = result;
+      for (s = str; s != NULL; s = va_arg (ap, const char *))
+        {
+          size_t len = strlen (s);
+
+          /* Resize the allocated memory if necessary.  */
+          if (wp + len + 1 > result + allocated)
+            {
+              allocated = (allocated + len) * 2;
+              newp = (char *) realloc (result, allocated);
+              if (newp == NULL)
+                {
+                  free (result);
+                  return NULL;
+                }
+              wp = newp + (wp - result);
+              result = newp;
+            }
+
+          wp = mempcpy (wp, s, len);
+        }
+
+      /* Terminate the result string.  */
+      *wp++ = '\0';
+
+      /* Resize memory to the optimal size.  */
+      newp = realloc (result, wp - result);
+      if (newp != NULL)
+        result = newp;
+
+      va_end (ap);
+    }
+
+  return result;
+}
+
+int h_sendto_app(void)
+{
+    // read data from server
+    char buffer[MAXDATASIZE];
+    struct hk_frag rcv_frag;
+    int ret, id;
+    int txid_key = 0;
+    int tosize = sizeof(to);
+    while(1){
+            // receive data from hooker userspace
+            bzero(buffer, sizeof(buffer));
+            ret = recvfrom(hsockUDP, buffer, MAXDATASIZE, 0, 
+                            (struct sockaddr *)&to, (socklen_t *)&tosize);
+            if(ret < 0) {
+                perror("recvfrom ()");
+                return errno;
+            }
+
+            //convert buffer to hooker fragment
+            memcpy(&rcv_frag, (struct hk_frag *)buffer, sizeof(struct hk_frag));
+
+            //calculate id from sock_key
+            id =  hash_sock(rcv_frag.skey);
+
+            //send id to msg redirector
+            ret = bpf_map_update_elem(txid_map, &txid_key, &id, BPF_EXIST);
+                      
+            // send read data to legacy app
+            if (send(hsock, rcv_frag.payload, strlen(rcv_frag.payload), 0) == -1){
+                    perror("send ");
+                    return errno;
+             }
+    }
+    
+
+
+    return 0;
+}
+
+void *thread_listen(void *arg)
+{
+    (void) arg;
+    h_listen_app();
+    pthread_exit(NULL);
+}
+
+void *thread_sendto(void *arg)
+{
+    (void) arg;
+    h_sendto_app();
+    pthread_exit(NULL);
+}
 
 char *find_cgroup_root(void)
 {
@@ -97,198 +390,15 @@ void detach_cgroup_root(int sig)
 }
 
 
-int h_init_sockets(void)
-{
-    // server socket
-    int err, one;
-    struct sockaddr_in addr;
 
-    // create redirection socket
-    if((hserv= socket(AF_INET, SOCK_STREAM, 0)) == -1){
-		perror("socket server failed");
-        return errno;
-	}
-
-    if((hsock = socket(AF_INET, SOCK_STREAM, 0)) == -1){
-		perror("socket hooker failed");
-        return errno;
-	}
-
-    // Allow reuse
-    err = setsockopt(hserv, SOL_SOCKET, SO_REUSEADDR,
-                        (char *)&one, sizeof(one));
-    if(err) {
-        perror("setsockopt server failed");
-        return errno;
-    }
-
-    // Non-blocking sockets => pour le accept
-    err = ioctl(hserv, FIONBIO, (char*)&one); // changer pour fcntl
-    if (err < 0)
-    {
-            perror("ioctl server failed");
-            return errno;
-    }
-
-    // Bind server socket
-    memset(&addr, 0, sizeof(struct sockaddr_in));
-    addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    addr.sin_port = htons(S1_PORT);
-	err = bind(hserv, (struct sockaddr *)&addr, sizeof(addr));
-	if (err < 0) {
-		perror("bind server failed()\n");
-		return errno;
-	}
-    
-    // listen server socket
-    addr.sin_port = htons(S1_PORT);
-	err = listen(hserv, 32);
-	if (err < 0) {
-		perror("listen server failed()\n");
-		return errno;
-	}   
-
-
-    //socket client
-
-    // Bind client
-    struct sockaddr_in caddr;
-    memset(&caddr, 0, sizeof(struct sockaddr_in));
-    caddr.sin_family = AF_INET;
-	caddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    caddr.sin_port = htons(H_PORT);
-	err = bind(hsock, (struct sockaddr *)&caddr, sizeof(caddr));
-	if (err < 0) {
-		perror("bind socket failed()\n");
-		return errno;
-	}
-
-    /* Initiate Connect */
-	addr.sin_port = htons(S1_PORT);
-	err = connect(hsock, (struct sockaddr *)&addr, sizeof(addr));
-	if (err < 0 && errno != EINPROGRESS) {
-		perror("connect socket client failed()\n");
-		return errno;
-	}
-
-    // accept connection
-    hacpt = accept(hserv, NULL, NULL);
-	if (hacpt < 0) {
-		perror("accept server failed()\n");
-		return errno;
-	}
-
-    // augmenter SND_BUF ???
-
-    // socket UDP for sending and receiving
-
-    hsockUDP = socket(AF_INET, SOCK_DGRAM, 0);
-    if(hsockUDP < 0) {
-        perror("creation socket UDP failed!");
-        return errno;
-    }
-
-    // Bind socket UDP , for, server or socket
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(S2_PORT);
-    err = bind(hsockUDP, (struct sockaddr *)&addr, sizeof(addr));
-	if (err < 0) {
-		perror("bind socket UDP failed()\n");
-		return errno;
-	}
-
-    // Fill destination information
-    // server
-    to.sin_family = AF_INET;
-    to.sin_port = htons(S2_PORT);
-    to.sin_addr.s_addr = inet_addr(serv_addr);
-
-    
-    return 0;
-}
-
-int h_listen_app(void)
-{
-    char buffer[MAXDATASIZE];
-    int ret;
-    while(1){
-            /* réception des données venant de l'application legacy */
-            bzero(buffer, sizeof(buffer));
-            if((ret = recv(hsock, buffer, MAXDATASIZE, 0)) == -1){
-                    perror("recv");
-                    return -1;
-            }
-            // affichage du message
-            printf("message rédirigé: %s", buffer);
-
-            // Transmission pour l'injection des données vers la destination
-            if((ret = sendto(hsockUDP, buffer, strlen(buffer), 0, 
-                    (const struct sockaddr *) &to, sizeof(to))) < 0 ) {
-
-                        perror("sendto()");
-                        return errno;
-
-            }
-    }
-    
-           
-    return 0;
-
-}
-
-int h_sendto_app(void)
-{
-    // read data from server
-    char buffer[MAXDATASIZE];
-    int ret;
-    int tosize = sizeof(to);
-    while(1){
-            bzero(buffer, sizeof(buffer));
-            ret = recvfrom(hsockUDP, buffer, MAXDATASIZE, 0, 
-                            (struct sockaddr *)&to, (socklen_t *)&tosize);
-            if(ret < 0) {
-                perror("recvfrom ()");
-                return errno;
-            }
-
-            // send read data to legacy app
-            if (send(hsock, buffer, strlen(buffer), 0) == -1){
-                    perror("send ");
-                    return errno;
-             }
-    }
-    
-
-
-    return 0;
-}
-
-void *thread_listen(void *arg)
-{
-    (void) arg;
-    h_listen_app();
-    pthread_exit(NULL);
-}
-
-void *thread_sendto(void *arg)
-{
-    (void) arg;
-    h_sendto_app();
-    pthread_exit(NULL);
-}
 
 int main(int argc, char*argv[])
 {
-    char bpf_file[256];
+  
     int status = 0;
 
-    /* Charger le programme ebpf dans le noyau */
-    snprintf(bpf_file, sizeof(bpf_file), "%s_kern.o", argv[0]);
-    
     printf("Loading bpf program in kernel...\n");
-    if (load_bpf_file(bpf_file)) {
+    if (load_bpf_file(HOOKER_BPF_FILENAME)) {
         printf("erreur!");
         fprintf(stderr, "ERR in load_bpf_file(): %s\n", bpf_log_buf);
         status = -1;
@@ -306,7 +416,7 @@ int main(int argc, char*argv[])
         goto out;
 
 
-    /* Récupération du descripteur du cgroup root */
+    /* get cgroup root descriptor */
     char *cgroup_root_path = find_cgroup_root();
     cg_fd = open(cgroup_root_path, O_RDONLY);
 	if (cg_fd < 0) {
@@ -315,24 +425,26 @@ int main(int argc, char*argv[])
 		goto out;
 	}
 
-    /* Initialisation de la map de comptage */
-    /*__u32 key = 0;
-    long value = 0;
-    int cnt_map = map_fd[0];
-    if(bpf_map_update_elem(cnt_map, &key, &value, BPF_ANY) != 0){
-        printf("update  cnt_map failed\n");
+    /* Initiate map */
+
+    // tx_id map
+    __u32 key = 0;
+    int value = 0;
+    txid_map = map_fd[0];
+    if(bpf_map_update_elem(txid_map, &key, &value, BPF_ANY) != 0){
+        printf("update  txid_map failed\n");
         status = -1;
         goto close; 
-    } */
+    }
 
-    /* ajout de la socket de redirection à la sockhash */
-    struct sock_key hsock_key = {};
-    /*redir_key.dip4 = 0;
-    redir_key.sip4 = 0;
-    redir_key.dport = 0;
-    redir_key.sport = 0;*/
-    
-    int hmap = map_fd[1];  
+    // mapping map
+    mapping_map = map_fd[1];
+
+
+    // hmap
+    // add redirection socket to sockhash 
+    struct sock_key hsock_key = {};  
+    hmap = map_fd[2];  
     if(bpf_map_update_elem(hmap, &hsock_key, &hsock, BPF_ANY) != 0) {
         printf("bpf_map_update hsockhash failed\n");
         perror("bpf_map_update");
@@ -341,7 +453,7 @@ int main(int argc, char*argv[])
     } 
  
 
-    /* Attachage des programmes ebpf */
+    /* Attach ebpf programs to... */
     
     printf("Attaching bpf program...\n");
     int bpf_sockops = prog_fd[0];
@@ -357,23 +469,15 @@ int main(int argc, char*argv[])
             goto err_sockops;
     } 
     
-    ret = bpf_prog_attach(bpf_redir, hmap, BPF_SK_MSG_VERDICT,0); //revoir le flag
+    ret = bpf_prog_attach(bpf_redir, hmap, BPF_SK_MSG_VERDICT,0);
     if(ret) {
             printf("Failed to attach bpf_redir to sockhash\tret = %d\n", ret);
             perror("bpf_prog_attach");
             status = -1;
             goto err_skmsg;
     } 
-    
-    /*printf("ajout réussi !\n");
-    goto err_skmsg; */
 
 
-    /** hooker userspace **/
-
-
-    // Création de threads
-    //thread d'écoute
     pthread_t h_listen_thread;
     pthread_t h_send_thread;
 
@@ -393,26 +497,6 @@ int main(int argc, char*argv[])
     }
 
 
-   /* printf("Hooker listen ...\n");
-    for (int i = 0; i < 5; i++)
-    {
-        if(h_listen(hsock) != 0){
-
-            status = -1; 
-            goto err_skmsg;
-        }
-            
-    } */
-    
-
-    /*for (int i = 0; i < 30; i++)
-    {
-        if(bpf_map_lookup_elem(map_fd[0], &key, &value) != 0) // voir la description
-            printf("DEBUG: bpf_map_lookup_elem failed\n");    
-        
-        printf("sock : %ld\n", value);
-        sleep(6);
-    } */
 
     ret = pthread_join(h_listen_thread, NULL);
     if(ret)
@@ -436,8 +520,8 @@ err_skmsg:
     if(ret) {
                 printf("Failed to detach bpf_redir program\tret = %d\n", ret);
                 perror("bpf_prog_attach");
-                status =-1; // attention au doublon
-                //goto err2;          
+                status =-1; 
+               
     }
 
 
@@ -449,13 +533,12 @@ err_sockops:
 
                 printf("Failed to detach bpf program\tret = %d\n", ret);
                 perror("bpf_prog_attach");
-                status =-1;
-                //goto err2;          
+                status =-1;        
     }
 
 
 close:
-    close(cg_fd); // La raison la plus probable pour laquelle detach ne fonctionnait pas.
+    close(cg_fd); 
     close(hsock);
 
 out: 
