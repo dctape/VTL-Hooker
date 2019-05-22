@@ -22,28 +22,31 @@
 
 void app(int sockfd)
 {
-    char buffer[MAXDATASIZE];
+    char rcv_buf[MAXDATASIZE];
 	int n, numbytes;
+    printf("Reception from data sent by client tcp:\n");
 	for(;;){
-		bzero(buffer, sizeof(buffer));
+		bzero(rcv_buf, sizeof(rcv_buf));
         /* Lecture du message du client */
-        if((numbytes = recv(sockfd, buffer, MAXDATASIZE, 0)) == -1){
+        if((numbytes = recv(sockfd, rcv_buf, MAXDATASIZE, 0)) == -1){
 			perror("recv");
 			exit(1);
 		}
-        buffer[numbytes] = '\0';
+        rcv_buf[numbytes] = '\0';
 
-        /* affichage du message du client */  // efbonfoh : au lieu d'un simple, ouvrir un fichier en écriture et y écrire 
+        /* affichage du message du client   // efbonfoh : au lieu d'un simple, ouvrir un fichier en écriture et y écrire 
 					      // les données reçues de façon à les sauvegarder
-        printf("Client : %sServeur :", buffer);
-        bzero(buffer, sizeof(buffer));
+        printf("Client : %sServeur :", buffer); */
+        printf("%s\n", rcv_buf);
+        bzero(rcv_buf, sizeof(rcv_buf));
         n = 0;
 
-        /* copie du message du serveur dans le buffer */
-		while((buffer[n++] = getchar()) != '\n')
+
+        // copie du message du serveur dans le buffer 
+		/*while((buffer[n++] = getchar()) != '\n')
 		;
 
-        /* envoie du message au client */
+        // envoie du message au client 
 		if (send(sockfd, buffer, strlen(buffer), 0) == -1){
 			perror("send ");
 			exit(1);
@@ -52,7 +55,7 @@ void app(int sockfd)
 		if ((strncmp(buffer, "exit", 4)) == 0){
 			printf("Server exit...\n");
 			break;
-		}
+		} */
 
 	}
 }

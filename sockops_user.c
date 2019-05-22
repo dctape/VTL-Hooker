@@ -37,15 +37,19 @@
 
 
 #define HOOKER_BPF_FILENAME        "sockops_kern.o"
-
-
 #define  CGROUP_PATH            "/test_cgroup"
 #define MAXDATASIZE 100
+
 #define SA struct sockaddr
+
 #define PORT 8080
-#define S1_PORT 10000
+#define H_SERV_PORT 10000
 #define S2_PORT 10001
 #define H_PORT 10002
+
+#define udpsock1_port       10005
+#define udpsock2_port       10006
+
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_err(MSG, ...) fprintf(stderr, "(%s:%d: errno: %s) " MSG "\n", \
@@ -66,14 +70,20 @@
 /* globals */
 int cg_fd;
 int hserv, hsock, hacpt, hsockUDP;
-char *serv_addr = "121.0.0.1";
+
+int udpsock1, udpsock2;
+struct sockaddr_in udpsock1_to;
+struct sockaddr_in udpsock2_to;
+
+
+char *serv_addr = "127.0.0.1";
 struct sockaddr_in to;
 
 //maps
 int txid_map, mapping_map, hmap;
 
 
-
+// structures
 struct sock_key{
 
     __u32 sip4;
@@ -97,16 +107,19 @@ int h_init_sockets(void)
     struct sockaddr_in addr;
 
     // create redirection socket
+    // hooker userspace server
     if((hserv= socket(AF_INET, SOCK_STREAM, 0)) == -1){
 		perror("socket server failed");
         return errno;
 	}
 
+    // redirection socket
     if((hsock = socket(AF_INET, SOCK_STREAM, 0)) == -1){
 		perror("socket hooker failed");
         return errno;
 	}
 
+    // hooker server configuration
     // Allow reuse
     err = setsockopt(hserv, SOL_SOCKET, SO_REUSEADDR,
                         (char *)&one, sizeof(one));
@@ -127,8 +140,7 @@ int h_init_sockets(void)
     memset(&addr, 0, sizeof(struct sockaddr_in));
     addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    addr.sin_port = htons(S1_PORT);
+    addr.sin_port = htons(H_SERV_PORT);
 	err = bind(hserv, (struct sockaddr *)&addr, sizeof(addr));
 	if (err < 0) {
 		perror("bind server failed()\n");
@@ -136,7 +148,7 @@ int h_init_sockets(void)
 	}
     
     // listen server socket
-    addr.sin_port = htons(S1_PORT);
+    addr.sin_port = htons(H_SERV_PORT);
 	err = listen(hserv, 32);
 	if (err < 0) {
 		perror("listen server failed()\n");
@@ -144,7 +156,7 @@ int h_init_sockets(void)
 	}   
 
 
-    //socket client
+    //hooker redirection socket 
 
     // Bind hsock
     struct sockaddr_in caddr;
@@ -159,7 +171,7 @@ int h_init_sockets(void)
 	}
 
     // Initiate Connect 
-	addr.sin_port = htons(S1_PORT);
+	addr.sin_port = htons(H_SERV_PORT);
 	err = connect(hsock, (struct sockaddr *)&addr, sizeof(addr));
 	if (err < 0 && errno != EINPROGRESS) {
 		perror("connect socket client failed()\n");
@@ -172,29 +184,6 @@ int h_init_sockets(void)
 		perror("accept server failed()\n");
 		return errno;
 	}
-
-
-    // socket UDP for sending and receiving
-
-    hsockUDP = socket(AF_INET, SOCK_DGRAM, 0);
-    if(hsockUDP < 0) {
-        perror("creation socket UDP failed!");
-        return errno;
-    }
-
-    // Bind socket UDP , for, server or socket
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(S2_PORT);
-    err = bind(hsockUDP, (struct sockaddr *)&addr, sizeof(addr));
-	if (err < 0) {
-		perror("bind socket UDP failed()\n");
-		return errno;
-	}
-
-    // Fill destination information (app legacy)
-    to.sin_family = AF_INET;
-    to.sin_port = htons(S2_PORT);
-    to.sin_addr.s_addr = inet_addr(serv_addr);
 
     
     return 0;
@@ -252,6 +241,74 @@ int h_listen_app(void)
     return 0;
 
 }
+
+int udp_config(void)
+{   
+    struct sockaddr_in addr;
+    int err;
+    
+    // initiate udp sockets
+    //udpsock1
+    udpsock1 = socket(AF_INET, SOCK_DGRAM, 0);
+    if(udpsock1 < 0) {
+        perror("creation udpsock1 failed!");
+        return errno;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(udpsock1_port);
+    err = bind(udpsock1, (struct sockaddr *)&addr, sizeof(addr));
+    if (err < 0) {
+		perror("bind udpsock2 failed");
+		return errno;
+	}
+
+    //udpsock2
+    udpsock2 = socket(AF_INET, SOCK_DGRAM, 0);
+    if(udpsock2 < 0) {
+        perror("creation udpsock2 failed!");
+        return errno;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(udpsock2_port);
+    err = bind(udpsock2, (struct sockaddr *)&addr, sizeof(addr));
+    if (err < 0) {
+		perror("bind udpsock2 failed");
+		return errno;
+	}
+
+    //config udp destination
+    
+    udpsock1_to.sin_family = AF_INET;
+    udpsock1_to.sin_port = htons(udpsock2_port);
+    udpsock1_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
+
+    udpsock2_to.sin_family = AF_INET;
+    udpsock2_to.sin_port = htons(udpsock1_port);
+    udpsock2_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
+
+
+    return 0;
+
+}
+
+int udp_snd(int sockudp, char *data)
+{   
+    return sendto(sockudp, data, strlen(data), 0,
+                (const struct sockaddr *) &to, sizeof(to));
+}
+
+int udp_rcv(int sockudp, char *data)
+{   
+    // attention to MAXDATASIZE
+    return recvfrom(sockudp, buf, MAXDATASIZE, 0 ,
+                                (struct sockaddr*)&to, (socklen_t *)&tosize);
+
+}
+
 
 char *
 concat (const char *str, ...) // appel à free sur le résultat.

@@ -15,27 +15,39 @@
 
 
 #define SA struct sockaddr 
-#define MAXDATASIZE 100
+#define MAXDATASIZE 1000
 #define PORT 9090
 char *dest_addr = "0.0.0.0";
 
 void app(int sockfd)
 {
-	char buffer[MAXDATASIZE];
-	int n, numbytes;
-	printf("Début de la conversation. \n");
+	//char rcv_buffer[MAXDATASIZE];
+	char snd_buf[MAXDATASIZE];
+	bzero(snd_buf, sizeof(snd_buf));  // important for ...
+	char *data = "Receiving data from client...";
+	memcpy(snd_buf, data, strlen(data));
+	//int n, numbytes;
+	//printf("Début de la conversation. \n");
+	printf("Client : Envoi des données...\n");
 	for(;;){
-		bzero(buffer, sizeof(buffer));
-		n  = 0;
+		//bzero(snd_buffer, sizeof(snd_buffer));
+		/*n  = 0;
 		printf("Client : ");
+		printf("Client : Envoi des données...\n");
 		while((buffer[n++] = getchar()) != '\n') // efbonfoh : ouvrir un fichier lambda et en envoyé le contenu.
 		;
 		if (send(sockfd, buffer, strlen(buffer), 0) == -1){
 			perror("send ");
 			exit(1);
+		} */
+
+		if (send(sockfd, snd_buf, strlen(snd_buf), 0) == -1){
+			perror("send ");
+			exit(1);
 		}
+		printf("Data sent.\n");
 		
-		bzero(buffer, sizeof(buffer));
+		/*bzero(buffer, sizeof(buffer));
 		if((numbytes = recv(sockfd, buffer, MAXDATASIZE, 0)) == -1){
 			perror("recv");
 			exit(1);
@@ -45,7 +57,10 @@ void app(int sockfd)
 		if ((strncmp(buffer, "exit", 4)) == 0){
 			printf("Client exit...\n");
 			break;
-		}
+		} */
+
+		sleep(6);
+		
 
 	}
 }
