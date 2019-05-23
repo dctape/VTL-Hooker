@@ -69,15 +69,17 @@
 
 /* globals */
 int cg_fd;
-int hserv, hsock, hacpt, hsockUDP;
+int hserv, hsock, hacpt; // hooker sockets
 
-int udpsock1, udpsock2;
-struct sockaddr_in udpsock1_to;
-struct sockaddr_in udpsock2_to;
+int udpsock1, udpsock2; // udp sockets
+
+typedef struct sockaddr_in sockaddr_in_t;
+sockaddr_in_t udpsock1_to;
+sockaddr_in_t udpsock2_to;
 
 
 char *serv_addr = "127.0.0.1";
-struct sockaddr_in to;
+
 
 //maps
 int txid_map, mapping_map, hmap;
@@ -93,14 +95,159 @@ struct sock_key{
 
 };
 
-struct hk_frag {
+typedef struct _hk_frag hk_frag_t;
+struct _hk_frag {
 
     struct sock_key skey;
     void *payload;
-} ;
+};
 
 
-int h_init_sockets(void)
+
+// part udp
+
+int udp_config(void)
+{   
+    struct sockaddr_in addr;
+    int err;
+    
+    // initiate udp sockets
+    //udpsock1
+    udpsock1 = socket(AF_INET, SOCK_DGRAM, 0);
+    if(udpsock1 < 0) {
+        perror("creation udpsock1 failed!");
+        return errno;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(udpsock1_port);
+    err = bind(udpsock1, (struct sockaddr *)&addr, sizeof(addr));
+    if (err < 0) {
+		perror("bind udpsock2 failed");
+		return errno;
+	}
+
+    //udpsock2
+    udpsock2 = socket(AF_INET, SOCK_DGRAM, 0);
+    if(udpsock2 < 0) {
+        perror("creation udpsock2 failed!");
+        return errno;
+    }
+
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(udpsock2_port);
+    err = bind(udpsock2, (struct sockaddr *)&addr, sizeof(addr));
+    if (err < 0) {
+		perror("bind udpsock2 failed");
+		return errno;
+	}
+
+    //config udp destination
+    
+    udpsock1_to.sin_family = AF_INET;
+    udpsock1_to.sin_port = htons(udpsock2_port);
+    udpsock1_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
+
+    udpsock2_to.sin_family = AF_INET;
+    udpsock2_to.sin_port = htons(udpsock1_port);
+    udpsock2_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
+
+
+    return 0;
+
+}
+
+int udp_snd(int sockudp, char *data, sockaddr_in_t to)
+{   
+    return sendto(sockudp, data, strlen(data), 0,
+                (const struct sockaddr *) &to, sizeof(to));
+}
+
+int udp_rcv(int sockudp, char *data, sockaddr_in_t from)
+{   
+    // attention to MAXDATASIZE
+    int fromsize = sizeof(from);
+    return recvfrom(sockudp, data, MAXDATASIZE, 0 ,
+                                (struct sockaddr*)&from, (socklen_t *)&fromsize);
+
+}
+
+// hooker listen to app
+int hk_get_data(char *rcv_buf)
+{   
+    bzero(rcv_buf, sizeof(rcv_buf));
+    return recv(hsock, rcv_buf, MAXDATASIZE, 0); //hsock global
+}
+
+// hooker send data to app
+int hk_snd_data(char *snd_buf)
+{
+    return send(hsock, snd_buf, strlen(snd_buf), 0);
+}
+
+int hk_data_encap(char *snd_buf)
+{   
+    int ret;
+    int id, id_key = 0;
+    struct sock_key skey = {}; // inside or outside loop
+    hk_frag_t snd_frag;
+    
+    // retrieve id sock...
+    //TODO : make txid_map local
+    if((ret = bpf_map_lookup_elem(txid_map, &id_key, &id)) < 0)
+    {
+        printf("get id sock failed\n");
+        return -1;
+    }
+
+    // get hooker header <=> sock key
+    //TODO : make mapping_map local
+    ret = bpf_map_lookup_elem(mapping_map, &id, &skey);
+    if(ret < 0)
+    {
+        printf("get skey failed\n");
+        return -1;
+    }
+
+    // build hooker fragment
+    snd_frag.skey = skey;
+    snd_frag.payload = snd_buf;
+
+    // convert to string for sending purpose. NB: byte order issues possible ??
+    snd_buf = (char *)malloc(sizeof(snd_frag));
+    memcpy(snd_buf, (hk_frag_t *)snd_buf, sizeof(hk_frag_t));
+
+    return 0;
+
+}
+
+int hk_data_decap(char *snd_buf)
+{   
+    int ret, id, txid_key = 0;
+    hk_frag_t rcv_frag;
+
+    //convert buffer to hooker fragment
+    memcpy(&rcv_frag, (hk_frag_t *)snd_buf, sizeof(hk_frag_t));
+
+    //calculate id from sock_key
+    id =  hash_sock(rcv_frag.skey);
+
+    //send id to msg redirector
+    ret = bpf_map_update_elem(txid_map, &txid_key, &id, BPF_EXIST);
+    if(ret < 0)
+    {
+        fprintf(stderr, "update tx_id map failed.\n");
+        return -1;
+    }
+
+    snd_buf = rcv_frag.payload;
+    
+    return 0;
+}
+
+int hk_init_sockets(void)
 {
  
     int err, one;
@@ -189,51 +336,37 @@ int h_init_sockets(void)
     return 0;
 }
 
-int h_listen_app(void)
+
+int __hk_listen_app(void)
 {
-    char buffer[MAXDATASIZE];
-    char *send_buff;
+    
+    char buf[MAXDATASIZE];
+    //char *snd_udp_buf;
     int ret;
-    int id_key = 0, id;
-    struct sock_key skey = {};
-    struct hk_frag frag = {};
-    while(1){
-            bzero(buffer, sizeof(buffer));
-            if((ret = recv(hsock, buffer, MAXDATASIZE, 0)) == -1){
-                    perror("recv");
-                    return -1;
-            }
-            printf("message rédirigé: %s", buffer);
-            
-            // retrieve id sock
-            if((ret = bpf_map_lookup_elem(txid_map, &id_key, &id)) < 0){
-                printf("get id sock failed\n");
-                return -1;
+    while(1)
+    {
+            // get data from legacy app ... works!
+            //bzero(buf, sizeof(buf));
+            ret = hk_get_data(buf);
+            if(ret < 0) {
+                perror("Get data from app failed");
+                return errno;
             }
 
-            // get hooker header <=> sock key
-            ret = bpf_map_lookup_elem(mapping_map, &id, &skey);
+            printf("message rédirigé: %s", buf);
+            
+            ret = hk_data_encap(buf);
+            if(ret < 0)
+                exit(1);
+
+            //send over udp
+            // sockudp global
+            // (1) -> (2) ; (1): client, (2): server
+            ret = udp_snd(udpsock1, buf, udpsock1_to);
             if(ret < 0)
             {
-                printf("get skey failed\n");
-                return -1;
-            }
-
-            // build hooker fragment
-            frag.skey = skey;
-            frag.payload = buffer;
-
-            // convert to string for sending purpose. NB: byte order issues possible ??
-            send_buff = (char *)malloc(sizeof(frag));
-            memcpy(send_buff, (struct hk_frag *)send_buff, sizeof(struct hk_frag));
-
-            //send
-            if((ret = sendto(hsockUDP, send_buff, strlen(send_buff), 0, 
-                    (const struct sockaddr *) &to, sizeof(to))) < 0 ) {
-
-                        perror("sendto()");
-                        return errno;
-
+                perror("sendto failed");
+                return errno;
             }
     }
     
@@ -242,73 +375,51 @@ int h_listen_app(void)
 
 }
 
-int udp_config(void)
-{   
-    struct sockaddr_in addr;
-    int err;
-    
-    // initiate udp sockets
-    //udpsock1
-    udpsock1 = socket(AF_INET, SOCK_DGRAM, 0);
-    if(udpsock1 < 0) {
-        perror("creation udpsock1 failed!");
-        return errno;
+int __hk_sendto_app(void)
+{
+    // read data from server
+    char buf[MAXDATASIZE];
+    int ret;
+    while(1){
+            // receive data from hooker userspace
+            bzero(buf, sizeof(buf));
+            //(2) <- (1)
+            ret = udp_rcv(udpsock2, buf, udpsock1_to);
+            if(ret < 0)
+            {
+                perror("udp_rcv failed");
+                return errno;
+            }
+            ret = hk_data_decap(buf);
+            if (ret < 0)
+                exit(1);
+
+            // send read data to legacy app
+            ret = hk_snd_data(buf);
+            if (ret < 0)
+            {
+                perror("hooker send data to app failed");
+                return errno;
+            }
+                      
     }
-
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(udpsock1_port);
-    err = bind(udpsock1, (struct sockaddr *)&addr, sizeof(addr));
-    if (err < 0) {
-		perror("bind udpsock2 failed");
-		return errno;
-	}
-
-    //udpsock2
-    udpsock2 = socket(AF_INET, SOCK_DGRAM, 0);
-    if(udpsock2 < 0) {
-        perror("creation udpsock2 failed!");
-        return errno;
-    }
-
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(udpsock2_port);
-    err = bind(udpsock2, (struct sockaddr *)&addr, sizeof(addr));
-    if (err < 0) {
-		perror("bind udpsock2 failed");
-		return errno;
-	}
-
-    //config udp destination
     
-    udpsock1_to.sin_family = AF_INET;
-    udpsock1_to.sin_port = htons(udpsock2_port);
-    udpsock1_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
-
-    udpsock2_to.sin_family = AF_INET;
-    udpsock2_to.sin_port = htons(udpsock1_port);
-    udpsock2_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
-
-
     return 0;
-
 }
 
-int udp_snd(int sockudp, char *data)
-{   
-    return sendto(sockudp, data, strlen(data), 0,
-                (const struct sockaddr *) &to, sizeof(to));
+void *hk_listen(void *arg)
+{
+    (void) arg;
+    __hk_listen_app();
+    pthread_exit(NULL);
 }
 
-int udp_rcv(int sockudp, char *data)
-{   
-    // attention to MAXDATASIZE
-    return recvfrom(sockudp, buf, MAXDATASIZE, 0 ,
-                                (struct sockaddr*)&to, (socklen_t *)&tosize);
-
+void *hk_sendto(void *arg)
+{
+    (void) arg;
+    __hk_sendto_app();
+    pthread_exit(NULL);
 }
-
 
 char *
 concat (const char *str, ...) // appel à free sur le résultat.
@@ -359,59 +470,6 @@ concat (const char *str, ...) // appel à free sur le résultat.
     }
 
   return result;
-}
-
-int h_sendto_app(void)
-{
-    // read data from server
-    char buffer[MAXDATASIZE];
-    struct hk_frag rcv_frag;
-    int ret, id;
-    int txid_key = 0;
-    int tosize = sizeof(to);
-    while(1){
-            // receive data from hooker userspace
-            bzero(buffer, sizeof(buffer));
-            ret = recvfrom(hsockUDP, buffer, MAXDATASIZE, 0, 
-                            (struct sockaddr *)&to, (socklen_t *)&tosize);
-            if(ret < 0) {
-                perror("recvfrom ()");
-                return errno;
-            }
-
-            //convert buffer to hooker fragment
-            memcpy(&rcv_frag, (struct hk_frag *)buffer, sizeof(struct hk_frag));
-
-            //calculate id from sock_key
-            id =  hash_sock(rcv_frag.skey);
-
-            //send id to msg redirector
-            ret = bpf_map_update_elem(txid_map, &txid_key, &id, BPF_EXIST);
-                      
-            // send read data to legacy app
-            if (send(hsock, rcv_frag.payload, strlen(rcv_frag.payload), 0) == -1){
-                    perror("send ");
-                    return errno;
-             }
-    }
-    
-
-
-    return 0;
-}
-
-void *thread_listen(void *arg)
-{
-    (void) arg;
-    h_listen_app();
-    pthread_exit(NULL);
-}
-
-void *thread_sendto(void *arg)
-{
-    (void) arg;
-    h_sendto_app();
-    pthread_exit(NULL);
 }
 
 char *find_cgroup_root(void)
@@ -469,11 +527,15 @@ int main(int argc, char*argv[])
     } 
     
     
-    if(h_init_sockets())
+    if(hk_init_sockets())
         goto out;
 
-
+    if(udp_config() < 0)
+        goto close; // TODO: close sockets udp
+    
+    
     /* get cgroup root descriptor */
+    
     char *cgroup_root_path = find_cgroup_root();
     cg_fd = open(cgroup_root_path, O_RDONLY);
 	if (cg_fd < 0) {
@@ -535,17 +597,17 @@ int main(int argc, char*argv[])
     } 
 
 
-    pthread_t h_listen_thread;
-    pthread_t h_send_thread;
+    pthread_t hk_listen_thr;
+    pthread_t hk_sendto_thr;
 
-    ret = pthread_create(&h_listen_thread, NULL, thread_listen, NULL);
+    ret = pthread_create(&hk_listen_thr, NULL, hk_listen, NULL);
     if(ret)
     {
         perror("Erreur pthread d'écoute");
         status = -1;
         goto err_skmsg;
     }
-    ret = pthread_create(&h_send_thread, NULL, thread_sendto, NULL);
+    ret = pthread_create(&hk_sendto_thr, NULL, hk_sendto, NULL);
     if(ret)
     {
         perror("Erreur pthread d'envoi");
@@ -555,14 +617,15 @@ int main(int argc, char*argv[])
 
 
 
-    ret = pthread_join(h_listen_thread, NULL);
+    ret = pthread_join(hk_listen_thr, NULL);
     if(ret)
     {
         perror("join listen failed");
         status = -1;
         goto err_skmsg;
     }
-    ret = pthread_join(h_send_thread, NULL);
+    ret = pthread_join(hk_sendto_thr, NULL);
+    
     if(ret)
     {
         perror("join sendto failed");
