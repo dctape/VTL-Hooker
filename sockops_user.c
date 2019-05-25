@@ -68,7 +68,6 @@
 
 
 /* globals */
-int cg_fd;
 int hserv, hsock, hacpt; // hooker sockets
 
 int udpsock1, udpsock2; // udp sockets
@@ -247,7 +246,7 @@ int hk_data_decap(char *snd_buf)
     return 0;
 }
 
-int hk_init_sockets(void)
+int hk_init_sock(void)
 {
  
     int err, one;
@@ -491,7 +490,7 @@ char *find_cgroup_root(void)
 	return NULL;
 } 
 
-void detach_cgroup_root(int sig)
+/*void detach_cgroup_root(int sig)
 {
     fprintf(stderr,"Removing bpf program...\nExit\n");
 	int ret = bpf_prog_detach2(prog_fd[0], cg_fd, BPF_CGROUP_SOCK_OPS);
@@ -502,18 +501,96 @@ void detach_cgroup_root(int sig)
     }
     close(cg_fd);
     exit(0); 
+} */
+
+
+int hk_inject_bpf(char *bpf_filename)
+{
+   if (load_bpf_file(bpf_filename)) {
+        printf("erreur!");
+        fprintf(stderr, "ERR in load_bpf_file(): %s\n", bpf_log_buf);
+        return -1;
+    } 
+
+    if (!prog_fd[0])  {
+        fprintf(stderr, "ERR: load_bpf_file : %s\n", strerror(errno));
+        return -1;
+    }
+
+    return 0; 
 }
 
+int hk_get_cgroup_root_fd(void)
+{   
+    int cgfd;
+    char *cgroup_root_path = find_cgroup_root();
+    cgfd = open(cgroup_root_path, O_RDONLY);
+	if (cgfd < 0) {
+		log_err("Opening Cgroup");
+        return -1; // Revoir...
+	}
+    return cgfd;
+}
 
+int hk_init_map(void)
+{
+  
+    __u32 key = 0;
+    int value = 0;
+    txid_map = map_fd[0];
+    if(bpf_map_update_elem(txid_map, &key, &value, BPF_ANY) != 0){
+        printf("update  txid_map failed\n");
+        return -1;
+    }
 
+    // mapping map
+    mapping_map = map_fd[1];
+
+    // hmap
+    // add redirection socket to sockhash 
+    struct sock_key hsock_key = {};  
+    hmap = map_fd[2];  
+    if(bpf_map_update_elem(hmap, &hsock_key, &hsock, BPF_ANY) != 0) {
+        printf("bpf_map_update hsockhash failed\n");
+        perror("bpf_map_update"); // TODO : remove ...
+        return -1;
+    }
+
+    return 0; 
+}
+
+int hk_bpf_attach(int *cgfd)
+{
+    int bpf_sockops = prog_fd[0];
+    int bpf_redir = prog_fd[1];
+    int ret;
+
+    ret = bpf_prog_attach(bpf_sockops, *cgfd, BPF_CGROUP_SOCK_OPS, 
+                                BPF_F_ALLOW_MULTI);
+	if(ret) {
+            printf("Failed to attach bpf_sockops to cgroup root program\tret = %d\n", ret); // TODO : remove...
+            perror("bpf_prog_attach"); 
+            return -1;
+    } 
+    
+    ret = bpf_prog_attach(bpf_redir, hmap, BPF_SK_MSG_VERDICT,0);
+    if(ret) {
+            printf("Failed to attach bpf_redir to sockhash\tret = %d\n", ret); // TODO : remove...
+            perror("bpf_prog_attach");
+            return -1;
+    } 
+
+    return 0;
+}
 
 int main(int argc, char*argv[])
 {
   
-    int status = 0;
+    int cgfd = 0, status = 0;
+   
 
     printf("Loading bpf program in kernel...\n");
-    if (load_bpf_file(HOOKER_BPF_FILENAME)) {
+    /*if (load_bpf_file(HOOKER_BPF_FILENAME)) {
         printf("erreur!");
         fprintf(stderr, "ERR in load_bpf_file(): %s\n", bpf_log_buf);
         status = -1;
@@ -524,10 +601,12 @@ int main(int argc, char*argv[])
         fprintf(stderr, "ERR: load_bpf_file : %s\n", strerror(errno));
         status = -1;
         goto out;
-    } 
+    } */
+    status = hk_inject_bpf(HOOKER_BPF_FILENAME);
+    if(status)
+        goto out;
     
-    
-    if(hk_init_sockets())
+    if(hk_init_sock())
         goto out;
 
     if(udp_config() < 0)
@@ -536,41 +615,21 @@ int main(int argc, char*argv[])
     
     /* get cgroup root descriptor */
     
-    char *cgroup_root_path = find_cgroup_root();
+    /*char *cgroup_root_path = find_cgroup_root();
     cg_fd = open(cgroup_root_path, O_RDONLY);
 	if (cg_fd < 0) {
 		log_err("Opening Cgroup");
         status = -1;
 		goto out;
-	}
+	} */
 
-    /* Initiate map */
+    cgfd = hk_get_cgroup_root_fd();
+    if(cgfd < 0)
+        goto out;
 
-    // tx_id map
-    __u32 key = 0;
-    int value = 0;
-    txid_map = map_fd[0];
-    if(bpf_map_update_elem(txid_map, &key, &value, BPF_ANY) != 0){
-        printf("update  txid_map failed\n");
-        status = -1;
-        goto close; 
-    }
-
-    // mapping map
-    mapping_map = map_fd[1];
-
-
-    // hmap
-    // add redirection socket to sockhash 
-    struct sock_key hsock_key = {};  
-    hmap = map_fd[2];  
-    if(bpf_map_update_elem(hmap, &hsock_key, &hsock, BPF_ANY) != 0) {
-        printf("bpf_map_update hsockhash failed\n");
-        perror("bpf_map_update");
-        status = -1;
+    status = hk_init_map();
+    if(status)
         goto close;
-    } 
- 
 
     /* Attach ebpf programs to... */
     
@@ -579,7 +638,7 @@ int main(int argc, char*argv[])
     int bpf_redir = prog_fd[1];
     int ret;
 
-    ret = bpf_prog_attach(bpf_sockops, cg_fd, BPF_CGROUP_SOCK_OPS, 
+    ret = bpf_prog_attach(bpf_sockops, cgfd, BPF_CGROUP_SOCK_OPS, 
                                 BPF_F_ALLOW_MULTI);
 	if(ret) {
             printf("Failed to attach bpf_sockops to cgroup root program\tret = %d\n", ret);
@@ -595,6 +654,11 @@ int main(int argc, char*argv[])
             status = -1;
             goto err_skmsg;
     } 
+
+    /*status = hk_bpf_attach(&cgfd);
+    if(status)
+        goto err_skmsg; */ // TODO: find a mean...
+    
 
 
     pthread_t hk_listen_thr;
@@ -648,7 +712,7 @@ err_skmsg:
 err_sockops:  
 
     printf("Removing bpf program...\nExit\n");
-    ret = bpf_prog_detach2(bpf_sockops, cg_fd, BPF_CGROUP_SOCK_OPS);
+    ret = bpf_prog_detach2(bpf_sockops, cgfd, BPF_CGROUP_SOCK_OPS);
     if(ret) {
 
                 printf("Failed to detach bpf program\tret = %d\n", ret);
@@ -658,7 +722,7 @@ err_sockops:
 
 
 close:
-    close(cg_fd); 
+    close(cgfd); 
     close(hsock);
 
 out: 

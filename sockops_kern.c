@@ -87,8 +87,9 @@ void h_add_hmap(struct bpf_sock_ops *skops)
 
 
 SEC("sockops")
-int msg_redirector_prog1(struct bpf_sock_ops *skops)
+int hk_add_sock(struct bpf_sock_ops *skops)
 {
+    /* add passive or active established socket  to hooker sockhash  */
   
     int key = 0;
     int *value;
@@ -111,7 +112,7 @@ int msg_redirector_prog1(struct bpf_sock_ops *skops)
 
 // 1 sk_msg pour msg redirector
 SEC("sk_msg")
-int msg_redirector_prog2(struct sk_msg_md *msg)
+int hk_msg_redir(struct sk_msg_md *msg)
 {
     __u64 flags = BPF_F_INGRESS;
     __u32 lport, rport;
