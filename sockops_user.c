@@ -201,6 +201,8 @@ int hk_data_encap(char *snd_buf)
         return -1;
     }
 
+    printf("encap: id = %d\n", id);
+
     // get hooker header <=> sock key
     //TODO : make mapping_map local
     ret = bpf_map_lookup_elem(mapping_map, &id, &skey);
@@ -214,6 +216,9 @@ int hk_data_encap(char *snd_buf)
     snd_frag.skey = skey;
     snd_frag.payload = snd_buf;
 
+    printf("hk_encap:sport %d   dport %d    sip4 %d    dip4 %d \n",
+            snd_frag.skey.sport, snd_frag.skey.dport, 
+            snd_frag.skey.sip4, snd_frag.skey.dip4);
     // convert to string for sending purpose. NB: byte order issues possible ??
     snd_buf = (char *)malloc(sizeof(snd_frag));
     memcpy(snd_buf, (hk_frag_t *)snd_buf, sizeof(hk_frag_t));
@@ -230,8 +235,11 @@ int hk_data_decap(char *snd_buf)
     //convert buffer to hooker fragment
     memcpy(&rcv_frag, (hk_frag_t *)snd_buf, sizeof(hk_frag_t));
 
+    printf("hk_decap: sport %d   dport %d    sip4 %d    dip4 %d\n",ntohl(rcv_frag.skey.sport), 
+                rcv_frag.skey.dport, rcv_frag.skey.sip4, rcv_frag.skey.dip4);
     //calculate id from sock_key
     id =  hash_sock(rcv_frag.skey);
+    printf("decap: id = %d\n", id);
 
     //send id to msg redirector
     ret = bpf_map_update_elem(txid_map, &txid_key, &id, BPF_EXIST);
@@ -348,11 +356,11 @@ int __hk_listen_app(void)
             //bzero(buf, sizeof(buf));
             ret = hk_get_data(buf);
             if(ret < 0) {
-                perror("Get data from app failed");
+                perror("Get data from app failed\n");
                 return errno;
             }
 
-            printf("message rédirigé: %s", buf);
+            //printf("message rédirigé: %s\n", buf);
             
             ret = hk_data_encap(buf);
             if(ret < 0)
@@ -361,12 +369,14 @@ int __hk_listen_app(void)
             //send over udp
             // sockudp global
             // (1) -> (2) ; (1): client, (2): server
+            printf("Thr listen: msg rcv from app: %s\n", buf);
             ret = udp_snd(udpsock1, buf, udpsock1_to);
             if(ret < 0)
             {
-                perror("sendto failed");
+                perror("sendto failed\n");
                 return errno;
             }
+            printf("Thr listen: msg sent over udp\n");
     }
     
            
@@ -386,20 +396,23 @@ int __hk_sendto_app(void)
             ret = udp_rcv(udpsock2, buf, udpsock1_to);
             if(ret < 0)
             {
-                perror("udp_rcv failed");
+                perror("udp_rcv failed\n");
                 return errno;
             }
             ret = hk_data_decap(buf);
+            printf("Thr sendto: msg rcv over udp: %s\n", buf);
             if (ret < 0)
                 exit(1);
 
             // send read data to legacy app
             ret = hk_snd_data(buf);
+            printf("sendto: ret = %d",ret);
             if (ret < 0)
             {
                 perror("hooker send data to app failed");
                 return errno;
             }
+            printf("Thr sendto : msg sent to app\n");
                       
     }
     

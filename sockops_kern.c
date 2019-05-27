@@ -31,7 +31,14 @@ struct sock_key{
     __u32 sport;
     __u32 dport;
 
-}__attribute__((packed));
+}; //TODO : __attribute__((packed))
+
+#define bpf_printk(fmt, ...)					\
+({								\
+	       char ____fmt[] = fmt;				\
+	       bpf_trace_printk(____fmt, sizeof(____fmt),	\
+				##__VA_ARGS__);			\
+})
 
 
 // map de passage de valeur
@@ -123,10 +130,12 @@ int hk_msg_redir(struct sk_msg_md *msg)
 
     
     
+    //lport = bpf_ntohl(msg->local_port);
     lport = msg->local_port;
     // comparaison au niveau du port
     if(lport == H_PORT){
         
+        bpf_printk("hooker -> app : port = %d\n", lport);
         // hooker userspace -> app
         struct sock_key *value ;
         int *val_id;
@@ -150,6 +159,7 @@ int hk_msg_redir(struct sk_msg_md *msg)
         // app -> hooker userspace
 
         // get msg sock_key
+        bpf_printk("app -> hooker: app_port = %d\n", lport);
         skey.dip4 = msg->remote_ip4;
         skey.sip4 = msg->local_ip4;
         skey.dport = msg->remote_port ; 
@@ -164,8 +174,9 @@ int hk_msg_redir(struct sk_msg_md *msg)
 
         // redirect to hooker  
         bpf_msg_redirect_hash(msg, &hmap, &hsock_key, flags);
-    }
+    } 
     
+   
     return SK_PASS;
 } 
 

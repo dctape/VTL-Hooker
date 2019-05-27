@@ -8,7 +8,8 @@
 
 
 TARGETS := sockops
-TARGETS += xdp_l4_count
+TARGETS += test
+
 
 TEST := tcp-server
 TEST += tcp-client
