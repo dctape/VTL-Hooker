@@ -18,7 +18,7 @@
 #define MAXDATASIZE 1000
 #define PORT 9090
 #define C_PORT	9091
-char *dest_addr = "0.0.0.0";
+char *dest_addr = "192.168.130.142"; // @IP vm3
 
 void app(int sockfd)
 {
@@ -60,7 +60,7 @@ void app(int sockfd)
 			break;
 		} */
 
-		sleep(6);
+		sleep(5);
 		
 
 	}
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Bind 
-	struct sockaddr_in caddr;
+	/*struct sockaddr_in caddr;
     memset(&caddr, 0, sizeof(struct sockaddr_in));
     caddr.sin_family = AF_INET;
 	caddr.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 	if (err < 0) {
 		perror("bind socket failed()\n");
 		return errno;
-	}
+	} */
 
 	/* remplir avec les infos d'adressage du serveur */
 	servaddr.sin_family = AF_INET;
