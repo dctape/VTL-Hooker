@@ -3,6 +3,7 @@
  * userspace test program
  * 
 */
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,7 +47,7 @@
 
 
 /* globals */
-int hserv, hsock, hacpt; // hooker sockets
+int hserv, hsock,hsock2, hacpt,hacpt2; // hooker sockets
 int hooker_map;
 typedef struct sockaddr_in sockaddr_in_t;
 
@@ -61,7 +62,9 @@ struct sock_key {
 
 };
 
+/** Fonctions secondaires **/
 
+/* retourne le chemin du cgroup root */
 char *find_cgroup_root(void)  // pas nécessaire
 {
 	struct mntent *mnt;
@@ -81,6 +84,7 @@ char *find_cgroup_root(void)  // pas nécessaire
 	return NULL;
 }
 
+/* injecte les programmes eBPF */
 int hk_inject_bpf(char *bpf_filename)
 {
    if (load_bpf_file(bpf_filename)) {
@@ -97,6 +101,8 @@ int hk_inject_bpf(char *bpf_filename)
     return 0; 
 }
 
+
+/* récupère le descripteur du cgroup root   */
 int hk_get_cgroup_root_fd(void)
 {   
     int cgfd;
@@ -109,12 +115,12 @@ int hk_get_cgroup_root_fd(void)
     return cgfd;
 }
 
+/* Initialise les sockets utilisés durant la redirection */
 int hk_init_sock(void)
 {
  
     int err, one;
     struct sockaddr_in addr;
-
     // create redirection socket
     // hooker userspace server
     if((hserv= socket(AF_INET, SOCK_STREAM, 0)) == -1){
@@ -130,12 +136,12 @@ int hk_init_sock(void)
 
     // hooker server configuration
     // Allow reuse
-    /*err = setsockopt(hserv, SOL_SOCKET, SO_REUSEADDR,
+    err = setsockopt(hserv, SOL_SOCKET, SO_REUSEADDR,
                         (char *)&one, sizeof(one));
     if(err) {
         perror("setsockopt server failed");
         return errno;
-    } */
+    } 
 
     // Non-blocking sockets
     err = ioctl(hserv, FIONBIO, (char*)&one); 
@@ -148,7 +154,7 @@ int hk_init_sock(void)
     // Bind server socket
     memset(&addr, 0, sizeof(struct sockaddr_in));
     addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	addr.sin_addr.s_addr = inet_addr("0.0.0.0");
     addr.sin_port = htons(H_SERV_PORT);
 	err = bind(hserv, (struct sockaddr *)&addr, sizeof(addr));
 	if (err < 0) {
@@ -198,21 +204,65 @@ int hk_init_sock(void)
     return 0;
 }
 
-int hk_get_data(char *rcv_buf)
+/* wrapper pour la récupération des données de l'application legacy */
+int hk_get_datafrom_redirector(char *rcv_buf)
 {   
-    return recv(hacpt, rcv_buf, MAXDATASIZE, 0); //hsock global
+    return recv(hsock, rcv_buf, MAXDATASIZE, 0); //hsock global
 }
 
-int hk_snd_data(char *snd_buf)
+
+/* wrapper pour l'envoi des données vers l'application legacy */
+int hk_snd_datato_redirector(char *snd_buf)
 {
     return send(hsock, snd_buf, strlen(snd_buf), 0);
 }
 
-int __hk_listen_app(void)
+/* fonction qui récupère les données de l'application legacy et les envoie vers le destinataire */
+
+// retourne les données redirigées par redirector
+int hk_recvfrom_redirector(char *rcv_data)
+{
+    int ret;
+    char buffer[MAXDATASIZE];
+    bzero(buffer, sizeof(buffer));
+
+    ret = hk_get_datafrom_redirector(buffer);
+    if(ret < 0) {
+        perror("Get data from redirector failed\n"); // TODO : change error message
+        return errno;
+    }  
+    rcv_data = buffer;
+    return 0;
+
+}
+
+int hk_sendto_redirector(char *snd_data)
+{
+    int ret;
+    ret = hk_snd_datato_redirector(snd_data);
+    if(ret < 0) {
+        perror("Send data to redirector failed\n"); //TODO : change error message
+        return errno;
+    }
+
+    return 0;
+}
+
+
+
+int hk_recvfrom_redirector(void)
 {
     
     char buf[MAXDATASIZE];
+    char *snd_buf = "First data...\n";
     int ret;
+
+    ret = hk_snd_data(snd_buf);
+    if(ret < 0){
+        perror("first send failed");
+        return errno;
+    }
+        
     printf("******Données redirigées*******\n");
     while(1)
     {
@@ -247,6 +297,7 @@ int __hk_listen_app(void)
 }
 
 
+/* Initialise les maps */
 int hk_init_map(void)
 {
   
@@ -280,7 +331,13 @@ int main(int argc, char*argv[])
     cgfd = hk_get_cgroup_root_fd();
     if(cgfd < 0)
         goto out;
+    
+    if(hk_init_sock())
+        goto out;
 
+    status = hk_init_map();
+    if(status)
+        goto close;
 
     /* Attach ebpf programs to... */
     
@@ -298,12 +355,7 @@ int main(int argc, char*argv[])
             goto err_sockops;
     } 
     
-    if(hk_init_sock())
-        goto out;
-
-    status = hk_init_map();
-    if(status)
-        goto close;
+    
 
 
     ret = bpf_prog_attach(bpf_redir, hooker_map, BPF_SK_MSG_VERDICT,0);

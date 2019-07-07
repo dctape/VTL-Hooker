@@ -7,7 +7,7 @@
 
 
 
-TARGETS := sockops
+TARGETS := hooker
 TARGETS += test
 
 

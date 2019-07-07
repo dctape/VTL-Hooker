@@ -1,8 +1,11 @@
 /* 
  *
  * hooker userspace
+ * launcher & adapter
  * 
 */ 
+
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,10 +39,9 @@
 #include "libbpf.h"
 
 
-#define HOOKER_BPF_FILENAME        "sockops_kern.o"
-#define  CGROUP_PATH            "/test_cgroup"
+#define HOOKER_BPF_FILENAME        "hooker_kern.o"
+//#define  CGROUP_PATH            "/test_cgroup"
 #define MAXDATASIZE 100
-
 #define SA struct sockaddr
 
 #define PORT 8080
