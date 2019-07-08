@@ -47,7 +47,7 @@
 
 
 /* globals */
-int hserv, hsock,hsock2, hacpt,hacpt2; // hooker sockets
+int sock_server, sock_redir,sock_redir2, hacpt,hacpt2; // hooker sockets
 int hooker_map;
 typedef struct sockaddr_in sockaddr_in_t;
 
@@ -121,30 +121,31 @@ int hk_init_sock(void)
  
     int err, one;
     struct sockaddr_in addr;
+    
     // create redirection socket
     // hooker userspace server
-    if((hserv= socket(AF_INET, SOCK_STREAM, 0)) == -1){
+    if((sock_server= socket(AF_INET, SOCK_STREAM, 0)) == -1){
 		perror("socket server failed");
         return errno;
 	}
 
     // redirection socket
-    if((hsock = socket(AF_INET, SOCK_STREAM, 0)) == -1){
-		perror("socket hooker failed");
+    if((sock_redir = socket(AF_INET, SOCK_STREAM, 0)) == -1){
+		perror(" Creation of hooker redirection socket failed");
         return errno;
 	}
 
     // hooker server configuration
     // Allow reuse
-    err = setsockopt(hserv, SOL_SOCKET, SO_REUSEADDR,
+    err = setsockopt(sock_server, SOL_SOCKET, SO_REUSEADDR,
                         (char *)&one, sizeof(one));
     if(err) {
-        perror("setsockopt server failed");
+        perror("setsockopt sock server failed");
         return errno;
     } 
 
     // Non-blocking sockets
-    err = ioctl(hserv, FIONBIO, (char*)&one); 
+    err = ioctl(sock_server, FIONBIO, (char*)&one); 
     if (err < 0)
     {
             perror("ioctl server failed");
@@ -156,7 +157,7 @@ int hk_init_sock(void)
     addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr("0.0.0.0");
     addr.sin_port = htons(H_SERV_PORT);
-	err = bind(hserv, (struct sockaddr *)&addr, sizeof(addr));
+	err = bind(sock_server, (struct sockaddr *)&addr, sizeof(addr));
 	if (err < 0) {
 		perror("bind server failed()\n");
 		return errno;
@@ -164,7 +165,7 @@ int hk_init_sock(void)
     
     // listen server socket
     addr.sin_port = htons(H_SERV_PORT);
-	err = listen(hserv, 32);
+	err = listen(sock_server, 32);
 	if (err < 0) {
 		perror("listen server failed()\n");
 		return errno;
@@ -173,13 +174,13 @@ int hk_init_sock(void)
 
     //hooker redirection socket 
 
-    // Bind hsock
+    // Bind sock_redir
     struct sockaddr_in caddr;
     memset(&caddr, 0, sizeof(struct sockaddr_in));
     caddr.sin_family = AF_INET;
 	caddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     caddr.sin_port = htons(H_PORT);
-	err = bind(hsock, (struct sockaddr *)&caddr, sizeof(caddr));
+	err = bind(sock_redir, (struct sockaddr *)&caddr, sizeof(caddr));
 	if (err < 0) {
 		perror("bind socket failed()\n");
 		return errno;
@@ -187,14 +188,14 @@ int hk_init_sock(void)
 
     // Initiate Connect 
 	addr.sin_port = htons(H_SERV_PORT);
-	err = connect(hsock, (struct sockaddr *)&addr, sizeof(addr));
+	err = connect(sock_redir, (struct sockaddr *)&addr, sizeof(addr));
 	if (err < 0 && errno != EINPROGRESS) {
 		perror("connect socket client failed()\n");
 		return errno;
 	}
 
     // accept connection
-    hacpt = accept(hserv, NULL, NULL);
+    hacpt = accept(sock_server, NULL, NULL);
 	if (hacpt < 0) {
 		perror("accept server failed()\n");
 		return errno;
@@ -204,18 +205,57 @@ int hk_init_sock(void)
     return 0;
 }
 
+/* Ajoute la socket de redirection à la sockhash */
+int hk_addsock_hmap(void)
+{
+  
+    // add redirection socket to sockhash 
+    sock_key_t sock_redir_key = {};  
+    hooker_map = map_fd[0];  
+    if(bpf_map_update_elem(hooker_map, &sock_redir_key, &sock_redir, BPF_ANY) != 0) {
+        printf("bpf_map_update sock_redirhash failed\n");
+        perror("bpf_map_update"); // TODO : remove ...
+        return -1;
+    }
+
+    return 0; 
+}
+
 /* wrapper pour la récupération des données de l'application legacy */
 int hk_get_datafrom_redirector(char *rcv_buf)
 {   
-    return recv(hsock, rcv_buf, MAXDATASIZE, 0); //hsock global
+    return recv(sock_redir, rcv_buf, MAXDATASIZE, 0); //sock_redir global
 }
 
 
 /* wrapper pour l'envoi des données vers l'application legacy */
 int hk_snd_datato_redirector(char *snd_buf)
 {
-    return send(hsock, snd_buf, strlen(snd_buf), 0);
+    return send(sock_redir, snd_buf, strlen(snd_buf), 0);
 }
+
+/** end fonctions secondaires **/
+
+
+
+
+int hk_adapter_config(void)
+{
+
+    int ret;
+    /* Initialisation des sockets */
+    ret = hk_init_sock();
+    if(ret < 0)
+        return ret;
+
+    /* Ajout de la socket de redirection à la sockhash */
+    ret = hk_addsock_hmap();
+    if(ret < 0)
+        return ret;
+
+    return 0;
+}
+
 
 /* fonction qui récupère les données de l'application legacy et les envoie vers le destinataire */
 
@@ -223,15 +263,15 @@ int hk_snd_datato_redirector(char *snd_buf)
 int hk_recvfrom_redirector(char *rcv_data)
 {
     int ret;
-    char buffer[MAXDATASIZE];
-    bzero(buffer, sizeof(buffer));
+    //char buffer[MAXDATASIZE];
+    bzero(rcv_data, sizeof(rcv_data));
 
-    ret = hk_get_datafrom_redirector(buffer);
+    ret = hk_get_datafrom_redirector(rcv_data);
     if(ret < 0) {
         perror("Get data from redirector failed\n"); // TODO : change error message
         return errno;
     }  
-    rcv_data = buffer;
+    //rcv_data = buffer;
     return 0;
 
 }
@@ -245,12 +285,12 @@ int hk_sendto_redirector(char *snd_data)
         return errno;
     }
 
-    return 0;
+    return 0; // or return ret
 }
 
 
 
-int hk_recvfrom_redirector(void)
+/* int hk_recvfrom_redirector(void)
 {
     
     char buf[MAXDATASIZE];
@@ -288,30 +328,16 @@ int hk_recvfrom_redirector(void)
                 return errno;
             }
             printf("ret: %d\n", ret);
-            printf("hserv buf:%s\n",buf);
+            printf("sock_server buf:%s\n",buf);
     }
     
            
     return 0;
 
-}
+} */
 
 
-/* Initialise les maps */
-int hk_init_map(void)
-{
-  
-    // add redirection socket to sockhash 
-    sock_key_t hsock_key = {};  
-    hooker_map = map_fd[0];  
-    if(bpf_map_update_elem(hooker_map, &hsock_key, &hsock, BPF_ANY) != 0) {
-        printf("bpf_map_update hsockhash failed\n");
-        perror("bpf_map_update"); // TODO : remove ...
-        return -1;
-    }
 
-    return 0; 
-}
 
 int main(int argc, char*argv[])
 {
@@ -319,7 +345,7 @@ int main(int argc, char*argv[])
     int cgfd = 0, status = 0;
    
 
-    printf("Loading bpf program in kernel...\n");
+    printf("Loading bpf program redirector in kernel...\n");
     status = hk_inject_bpf(TEST_BPF_FILENAME);
     
     if(status)
@@ -332,15 +358,15 @@ int main(int argc, char*argv[])
     if(cgfd < 0)
         goto out;
     
-    if(hk_init_sock())
-        goto out;
 
-    status = hk_init_map();
+    /* Configure adapter */
+    status = hk_adapter_config();
     if(status)
         goto close;
 
+
     /* Attach ebpf programs to... */
-    
+    // TODO : revoir cette section du code source
     printf("Attaching bpf program...\n");
     int bpf_sockops = prog_fd[0];
     int bpf_redir = prog_fd[1];
@@ -355,9 +381,6 @@ int main(int argc, char*argv[])
             goto err_sockops;
     } 
     
-    
-
-
     ret = bpf_prog_attach(bpf_redir, hooker_map, BPF_SK_MSG_VERDICT,0);
     if(ret) {
             printf("Failed to attach bpf_redir to sockhash\tret = %d\n", ret);
@@ -366,8 +389,34 @@ int main(int argc, char*argv[])
             goto err_skmsg;
     }
 
+    char buf[MAXDATASIZE];
 
-    __hk_listen_app(); // TODO: don't forget test
+    for(;;){
+
+        /*Recupérer les données provenant de Redirector */
+        ret = hk_recvfrom_redirector(buf);
+        if(ret < 0)   
+            goto err_skmsg;
+        
+
+        /* Afficher ces données */
+        printf("%s\n", buf);
+        
+        /* Les renvoyer à l'application émettrice */
+        ret = hk_sendto_redirector(buf);
+        if(ret < 0)
+            goto err_skmsg;
+
+        ret = recv(hacpt, buf, MAXDATASIZE, 0);
+        if(ret < 0) {
+                perror("recv hooker server failed\n");
+                return errno;
+        }
+        //printf("ret: %d\n", ret);
+        printf("sock_server:%s\n",buf);
+    }
+
+   // __hk_listen_app(); // TODO: don't forget test
 
 
 err_skmsg:
