@@ -34,21 +34,33 @@ struct bpf_map_def SEC("maps") hooker_map = {
 	.type = BPF_MAP_TYPE_SOCKHASH,
 	.key_size = sizeof(sock_key_t),
 	.value_size = sizeof(int),
-	.max_entries = 20,
+	.max_entries = 20
 };
 
 void hk_add_hmap(struct bpf_sock_ops *skops)
 {
+    /* Extract key */
     sock_key_t skey = {};
    
     skey.dip4 = skops->remote_ip4;
     skey.sip4 = skops->local_ip4;
     skey.dport = skops->remote_port ; 
     skey.sport = bpf_ntohl(skops->local_port) ;
-         
-    bpf_printk("sport: %d\n", skops->local_port);
-    bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST);
 
+    /* Add sock redir to hmap */
+    if(skops->local_port == H_PORT) { //ok
+        
+        sock_key_t skey_redir = {};
+        bpf_printk("sock_redir - sport: %d\n", skops->local_port);
+        bpf_sock_hash_update(skops, &hooker_map, &skey_redir, BPF_NOEXIST); // ok
+    }
+    else {
+        bpf_printk("other_sock - sport: %d\n", skops->local_port);
+        bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST);
+    }
+    
+    /* bpf_printk("sport: %d\n", skops->local_port);
+    bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST); */
 }
 
 SEC("sockops")
@@ -86,14 +98,14 @@ int hk_msg_redir(struct sk_msg_md *msg)
 {
     __u64 flags = BPF_F_INGRESS;
     __u32 lport;
-    struct sock_key hsock_key = {};
+    sock_key_t hsock_key = {};
 
     lport = msg->local_port;
 
     if(lport == H_PORT){
 
         bpf_printk("hooker -> app\n");
-        return SK_PASS;
+        return SK_DROP;
     }
     else{
         bpf_printk("app -> hooker: port = %d\n", lport);

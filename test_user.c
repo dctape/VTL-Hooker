@@ -249,9 +249,9 @@ int hk_adapter_config(void)
         return ret;
 
     /* Ajout de la socket de redirection à la sockhash */
-    ret = hk_addsock_hmap();
+    /* ret = hk_addsock_hmap();
     if(ret < 0)
-        return ret;
+        return ret; */
 
     return 0;
 }
@@ -364,7 +364,7 @@ int main(int argc, char*argv[])
     if(status)
         goto close;
 
-
+    hooker_map = map_fd[0]; // TODO : changer de position dans le code
     /* Attach ebpf programs to... */
     // TODO : revoir cette section du code source
     printf("Attaching bpf program...\n");
@@ -407,13 +407,13 @@ int main(int argc, char*argv[])
         if(ret < 0)
             goto err_skmsg;
 
-        ret = recv(hacpt, buf, MAXDATASIZE, 0);
+        /* ret = recv(hacpt, buf, MAXDATASIZE, 0);
         if(ret < 0) {
                 perror("recv hooker server failed\n");
                 return errno;
-        }
+        } 
         //printf("ret: %d\n", ret);
-        printf("sock_server:%s\n",buf);
+        printf("sock_server:%s\n",buf); */
     }
 
    // __hk_listen_app(); // TODO: don't forget test
