@@ -13,6 +13,8 @@ TARGETS += test
 
 TEST := tcp-server
 TEST += tcp-client
+TEST += client-chat
+TEST += server-chat
 
 # Linking with libbpf and libpcap
 # TARGETS_PCAP += xdp_tcpdump
