@@ -47,20 +47,8 @@ void hk_add_hmap(struct bpf_sock_ops *skops)
     skey.dport = skops->remote_port ; 
     skey.sport = bpf_ntohl(skops->local_port) ;
 
-    /* Add sock redir to hmap */
-    if(skops->local_port == H_PORT) { //ok
-        
-        sock_key_t skey_redir = {};
-        bpf_printk("sock_redir - sport: %d\n", skops->local_port);
-        bpf_sock_hash_update(skops, &hooker_map, &skey_redir, BPF_NOEXIST); // ok
-    }
-    else {
-        bpf_printk("other_sock - sport: %d\n", skops->local_port);
-        bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST);
-    }
-    
-    /* bpf_printk("sport: %d\n", skops->local_port);
-    bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST); */
+    bpf_printk("sport: %d\n", skops->local_port);
+    bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST);
 }
 
 SEC("sockops")
@@ -105,7 +93,7 @@ int hk_msg_redir(struct sk_msg_md *msg)
     if(lport == H_PORT){
 
         bpf_printk("hooker -> app\n");
-        return SK_DROP;
+        return SK_PASS;
     }
     else{
         bpf_printk("app -> hooker: port = %d\n", lport);

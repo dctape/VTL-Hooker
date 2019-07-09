@@ -48,10 +48,10 @@
 
 /* globals */
 int sock_server, sock_redir,sock_redir2, hacpt,hacpt2; // hooker sockets
-int hooker_map;
+
+int hk_map; // redirection map
+
 typedef struct sockaddr_in sockaddr_in_t;
-
-
 typedef struct sock_key sock_key_t;
 struct sock_key {
 
@@ -211,8 +211,8 @@ int hk_addsock_hmap(void)
   
     // add redirection socket to sockhash 
     sock_key_t sock_redir_key = {};  
-    hooker_map = map_fd[0];  
-    if(bpf_map_update_elem(hooker_map, &sock_redir_key, &sock_redir, BPF_ANY) != 0) {
+    hk_map = map_fd[0];  
+    if(bpf_map_update_elem(hk_map, &sock_redir_key, &sock_redir, BPF_ANY) != 0) {
         printf("bpf_map_update sock_redirhash failed\n");
         perror("bpf_map_update"); // TODO : remove ...
         return -1;
@@ -227,7 +227,6 @@ int hk_get_datafrom_redirector(char *rcv_buf)
     return recv(sock_redir, rcv_buf, MAXDATASIZE, 0); //sock_redir global
 }
 
-
 /* wrapper pour l'envoi des données vers l'application legacy */
 int hk_snd_datato_redirector(char *snd_buf)
 {
@@ -238,7 +237,7 @@ int hk_snd_datato_redirector(char *snd_buf)
 
 
 
-
+/* adapter configurations */
 int hk_adapter_config(void)
 {
 
@@ -276,6 +275,7 @@ int hk_recvfrom_redirector(char *rcv_data)
 
 }
 
+// envoie les données au redirector + metadata pour trouver la bonne application vers laquelle rediriger
 int hk_sendto_redirector(char *snd_data)
 {
     int ret;
@@ -287,7 +287,6 @@ int hk_sendto_redirector(char *snd_data)
 
     return 0; // or return ret
 }
-
 
 
 /* int hk_recvfrom_redirector(void)
@@ -344,10 +343,9 @@ int main(int argc, char*argv[])
   
     int cgfd = 0, status = 0;
    
-
+    /* loading bpf program ~ redirector */
     printf("Loading bpf program redirector in kernel...\n");
-    status = hk_inject_bpf(TEST_BPF_FILENAME);
-    
+    status = hk_inject_bpf(TEST_BPF_FILENAME); 
     if(status)
         goto out;
 
@@ -364,14 +362,36 @@ int main(int argc, char*argv[])
     if(status)
         goto close;
 
-    hooker_map = map_fd[0]; // TODO : changer de position dans le code
-    /* Attach ebpf programs to... */
+    
+    
+    /* Attach bpf programs to... */
+    
     // TODO : revoir cette section du code source
     printf("Attaching bpf program...\n");
     int bpf_sockops = prog_fd[0];
     int bpf_redir = prog_fd[1];
     int ret;
 
+    // Attach sk_msg programs 
+    hk_map = map_fd[0]; // TODO : changer de position dans le code
+    ret = bpf_prog_attach(bpf_redir, hk_map, BPF_SK_MSG_VERDICT,0);
+    if(ret) {
+            printf("Failed to attach bpf_redir to sockhash\tret = %d\n", ret);
+            perror("bpf_prog_attach");
+            status = -1;
+            goto err_skmsg; // TODO : change
+    }
+
+    // add redirection socket to hk_map
+    sock_key_t sock_redir_key = {};   
+    if(bpf_map_update_elem(hk_map, &sock_redir_key, &sock_redir, BPF_ANY) != 0) {
+        printf("bpf_map_update sock_redirhash failed\n");
+        perror("bpf_map_update"); // TODO : remove ...
+        status = -1;
+        goto err_skmsg;
+    }
+
+    // attach sockops programs...
     ret = bpf_prog_attach(bpf_sockops, cgfd, BPF_CGROUP_SOCK_OPS, 
                                 BPF_F_ALLOW_MULTI);
 	if(ret) {
@@ -381,13 +401,7 @@ int main(int argc, char*argv[])
             goto err_sockops;
     } 
     
-    ret = bpf_prog_attach(bpf_redir, hooker_map, BPF_SK_MSG_VERDICT,0);
-    if(ret) {
-            printf("Failed to attach bpf_redir to sockhash\tret = %d\n", ret);
-            perror("bpf_prog_attach");
-            status = -1;
-            goto err_skmsg;
-    }
+    
 
     char buf[MAXDATASIZE];
 
@@ -419,16 +433,6 @@ int main(int argc, char*argv[])
    // __hk_listen_app(); // TODO: don't forget test
 
 
-err_skmsg:
-    
-    printf("Removing bpf_redir program...\nExit\n");
-    ret = bpf_prog_detach2(bpf_redir, hooker_map, BPF_SK_MSG_VERDICT);
-    if(ret) {
-                printf("Failed to detach bpf_redir program\tret = %d\n", ret);
-                perror("bpf_prog_attach");
-                status =-1; 
-               
-    }
 
 err_sockops:  
 
@@ -441,6 +445,16 @@ err_sockops:
                 status =-1;        
     }
 
+err_skmsg:
+    
+    printf("Removing bpf_redir program...\nExit\n");
+    ret = bpf_prog_detach2(bpf_redir, hk_map, BPF_SK_MSG_VERDICT);
+    if(ret) {
+                printf("Failed to detach bpf_redir program\tret = %d\n", ret);
+                perror("bpf_prog_attach");
+                status =-1; 
+               
+    }
 
 close:
     close(cgfd); 
