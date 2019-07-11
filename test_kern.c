@@ -11,12 +11,7 @@
 #include "bpf_endian.h"
 
 #define H_PORT                      10002
-
-#define HASH_SIZE   20
-#define hash_sock(skey) ( \
-( (skey.sport & 0xff) | ((skey.dport & 0xff) << 8) | \
-  ((skey.sip4 & 0xff) << 16) | ((skey.dip4 & 0xff) << 24) \
-) % HASH_SIZE)
+#define C_PORT                      9092
 
 #define bpf_printk(fmt, ...)					\
 ({								\
@@ -36,22 +31,13 @@ struct sock_key{
 
 };
 
-// map de passage du token <-> espace utilisateur
-struct bpf_map_def SEC("maps") tx_token = {
+// map stockant la clé socket du client => 
+struct bpf_map_def SEC("maps") sock_key_map = {
     .type = BPF_MAP_TYPE_ARRAY,
     .key_size = sizeof(int),
-    .value_size = sizeof(int), // token
+    .value_size = sizeof(sock_key_t), // sock_key
     .max_entries = 1,
 };
-
-// map d'association du token avec la sock_key
-struct bpf_map_def SEC("maps") mapping = { // TODO: change name later...
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(int),                // token
-    .value_size = sizeof(struct sock_key),  // sock_key
-    .max_entries = 20,
-};
-
 
 struct bpf_map_def SEC("maps") hooker_map = {
 	.type = BPF_MAP_TYPE_SOCKHASH,
@@ -60,23 +46,24 @@ struct bpf_map_def SEC("maps") hooker_map = {
 	.max_entries = 20
 };
 
+
+
 void hk_add_hmap(struct bpf_sock_ops *skops)
 {
     /* Extract key */
-    sock_key_t skey = {};
-    int token;
-   
+    sock_key_t skey = {};  
     skey.dip4 = skops->remote_ip4;
     skey.sip4 = skops->local_ip4;
     skey.dport = skops->remote_port ; 
     skey.sport = bpf_ntohl(skops->local_port) ;
 
-    /* calculate token for this skey */
-    token = hash_sock(skey);
-
-    /* add token in mapping map */
-    bpf_map_update_elem(&mapping, &token, &skey, BPF_ANY);
-    bpf_printk("sport: %d\n", skops->local_port);
+    /* test */
+    bpf_printk("sport: %d", skops->local_port);
+    if(skops->local_port == C_PORT){
+        int key = 0;
+        bpf_map_update_elem(&sock_key_map, &key, &skey, BPF_ANY);
+    }
+   
     bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST);
 }
 
@@ -91,7 +78,7 @@ int hk_add_sock(struct bpf_sock_ops *skops)
 
     switch(op){
 
-        case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
+        case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB: // pas la peine d'ajouter tous les sockets
                 bpf_printk("serveur\n");
                 hk_add_hmap(skops);
             break;       
@@ -115,64 +102,40 @@ int hk_msg_redir(struct sk_msg_md *msg)
 {
     __u64 flags = BPF_F_INGRESS;
     __u32 lport;
-    sock_key_t hsock_key = {};
-    sock_key_t skey = {};
-    int token_key = 0; // TODO : change name later...
+    sock_key_t hsock_key = {};  
 
     lport = msg->local_port; // ok
 
-    if(lport == H_PORT){
-        // hooker userpace -> app
-        bpf_printk("hooker -> app\n");
-        int *token_val;
-        int token; // Not necessary
+    switch(lport){
 
-        sock_key_t * skey_val;
+        case H_PORT:
+           // hooker userpace -> app
+           bpf_printk("hooker -> app\n");
 
-        //retrieve token from userspace
-        token_val = bpf_map_lookup_elem(&tx_token, &token_key);
-        if(!token_val) {
-            bpf_printk("token not found\n");
-            return SK_DROP;
-        }
+           //retrieve sock_key client
+           int key = 0;
+           sock_key_t *value;
+           sock_key_t c_skey = {};
+           value = bpf_map_lookup_elem(&sock_key_map, &key); // pas optimal
+           if(!value)
+                return SK_DROP;
+           c_skey = *value;
+
+           //redirect data to app
+           bpf_msg_redirect_hash(msg, &hooker_map, &c_skey, flags);
+           break;
+              
+        case C_PORT:
             
-        token = *token_val;
-
-        //retrieve sock_key with token
-        skey_val =  bpf_map_lookup_elem(&mapping, &token);
-        if(!skey_val){
-            bpf_printk("skey not found\n");
-            return SK_DROP;
-        }
-        skey = *skey_val; // Not necessary
-
-        //redirect data to app
-        bpf_msg_redirect_hash(msg, &hooker_map, &skey, flags);
-
-        //return SK_PASS;
+           // app client -> hooker userspace
+           bpf_msg_redirect_hash(msg, &hooker_map, &hsock_key, flags);
+           break;
+      
+        
+        default:
+            break; //optional
     }
-    else{
-        // app -> hooker userspace
 
-        bpf_printk("app ->  hooker: port = %d\n", lport);
-
-        // extract key
-        skey.dip4 = msg->remote_ip4;
-        skey.sip4 = msg->local_ip4;
-        skey.dport = msg->remote_port ; 
-        skey.sport = bpf_ntohl(msg->local_port); //est-ce que cela ne sera pas problématique ?
-
-        // calculate token
-        int token  =  hash_sock(skey);
-
-        // transmit token to userspace
-        bpf_map_update_elem(&tx_token, &token_key, &token, BPF_EXIST);
-
-        //redirect to hooker
-        bpf_msg_redirect_hash(msg, &hooker_map, &hsock_key, flags);
-    }
-    
-     
    
     return SK_PASS;
 } 

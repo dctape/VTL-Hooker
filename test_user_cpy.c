@@ -49,7 +49,7 @@
 /* globals */
 int sock_server, sock_redir,sock_redir2, hacpt,hacpt2; // hooker sockets
 
-int sock_key_map;
+int txtoken_map, mapping_map;
 int hk_map; // redirection map
 
 
@@ -211,13 +211,16 @@ int hk_init_sock(void)
 int hk_init_map(void)
 {
     __u32 key = 0;
-    sock_key_t value = {};
-    sock_key_map = map_fd[0];
-    if(bpf_map_update_elem(sock_key_map, &key, &value, BPF_ANY) != 0){
-        printf("update  sock_key_map failed\n");
+    int value = 0;
+    txtoken_map = map_fd[0];
+    //rxtoken_map = map_fd[1]
+    if(bpf_map_update_elem(txtoken_map, &key, &value, BPF_ANY) != 0){
+        printf("update  txid_map failed\n");
         return -1;
     }
-
+    // mapping map
+    mapping_map = map_fd[2];
+    
     return 0; 
 }
 
@@ -262,16 +265,15 @@ int hk_adapter_config(void)
 // retourne les données redirigées par redirector
 int hk_recvfrom_redirector(char *rcv_data)
 {
-    int numbytes; // TODO : change name later...
+    int ret;
     //char buffer[MAXDATASIZE];
     bzero(rcv_data, sizeof(rcv_data));
 
-    numbytes = hk_get_datafrom_redirector(rcv_data);
-    if(numbytes < 0) {
+    ret = hk_get_datafrom_redirector(rcv_data);
+    if(ret < 0) {
         perror("Get data from redirector failed\n"); // TODO : change error message
         return errno;
-    }
-    rcv_data[numbytes] = '\0'; // Important afin d'éviter l'apparition de données étrangères  
+    }  
     //rcv_data = buffer;
     return 0;
 
@@ -375,7 +377,7 @@ int main(int argc, char*argv[])
     int ret;
 
     // Attach sk_msg programs 
-    hk_map = map_fd[1]; // TODO : changer de position dans le code
+    hk_map = map_fd[3]; // TODO : changer de position dans le code
     ret = bpf_prog_attach(bpf_redir, hk_map, BPF_SK_MSG_VERDICT,0);
     if(ret) {
             printf("Failed to attach bpf_redir to sockhash\tret = %d\n", ret);
@@ -411,7 +413,13 @@ int main(int argc, char*argv[])
     int token, token_key = 0;
     for(;;){
 
-      
+        /* Récuperer le token provenant de Redirector */
+        if((ret = bpf_map_lookup_elem(txtoken_map, &token_key, &token)) < 0) {
+            printf("get id sock failed\n");
+            status = -1;
+            goto err_sockops;
+        }
+
         /*Recupérer les données provenant de Redirector */
         ret = hk_recvfrom_redirector(buf);
         if(ret < 0)   
@@ -420,7 +428,15 @@ int main(int argc, char*argv[])
 
         /* Afficher ces données */
         printf("%s\n", buf);
-              
+        
+        /* Retransmettre le token au Redirector */
+        ret = bpf_map_update_elem(txtoken_map, &token_key, &token, BPF_EXIST);
+        if(ret < 0){
+            fprintf(stderr, "update tx_id map failed.\n");
+            status = -1;
+            goto err_sockops;
+        }
+
         /* Les renvoyer à l'application émettrice */
         ret = hk_sendto_redirector(buf);
         if(ret < 0)

@@ -69,7 +69,7 @@ void app(int sockfd)
 
 int main(int argc, char *argv[])
 {
-	int sockfd;
+	int sockfd, err;
 
 	struct hostent *hostinfo = NULL;
 	struct sockaddr_in servaddr; /* connector's address information */
@@ -91,16 +91,16 @@ int main(int argc, char *argv[])
 	}
 
 	// Bind 
-	/*struct sockaddr_in caddr;
+	struct sockaddr_in caddr;
     memset(&caddr, 0, sizeof(struct sockaddr_in));
     caddr.sin_family = AF_INET;
-	caddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	caddr.sin_addr.s_addr = inet_addr("0.0.0.0"); // important, pas 127.0.0.1
     caddr.sin_port = htons(C_PORT);
 	err = bind(sockfd, (struct sockaddr *)&caddr, sizeof(caddr));
 	if (err < 0) {
 		perror("bind socket failed()\n");
 		return errno;
-	} */
+	} 
 
 	/* remplir avec les infos d'adressage du serveur */
 	servaddr.sin_family = AF_INET;

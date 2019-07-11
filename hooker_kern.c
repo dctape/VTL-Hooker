@@ -165,6 +165,11 @@ int hk_msg_redir(struct sk_msg_md *msg)
         skey.dport = msg->remote_port ; 
         skey.sport = bpf_ntohl(msg->local_port); //est-ce que cela ne sera pas problématique ?
 
+        // push header
+       /* int  offset = 0;
+        int len = sizeof(sock_key_t)
+        bpf_msg_push_data(msg, ) */
+
         // retrieve id app
         int id;
         id = hash_sock(skey);
