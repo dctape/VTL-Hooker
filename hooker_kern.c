@@ -1,37 +1,17 @@
+/*
+ *
+ * test program ebpf
+ *  
+ * 
+*/
 
 //#include <uapi/linux/bpf.h>
 #include <linux/bpf.h>
-#include "bpf_helpers.h"
-#include "bpf_endian.h"
+#include "./bpf/bpf_helpers.h"
+#include "./bpf/bpf_endian.h"
 
-
-#define SOCKOPS_MAP_SIZE            20
 #define H_PORT                      10002
-#define S_PORT                      9090
-
-
-// definition of memcpy
-#ifndef memcpy
-# define memcpy(dest, src, n)   __builtin_memcpy((dest), (src), (n))
-#endif
-
-
-#define HASH_SIZE   20
-
-
-#define hash_sock(skey) ( \
-( (skey.sport & 0xff) | ((skey.dport & 0xff) << 8) | \
-  ((skey.sip4 & 0xff) << 16) | ((skey.dip4 & 0xff) << 24) \
-) % HASH_SIZE) 
-
-struct sock_key{
-
-    __u32 sip4;
-    __u32 dip4;
-    __u32 sport;
-    __u32 dport;
-
-}; //TODO : __attribute__((packed))
+#define C_PORT                      9092
 
 #define bpf_printk(fmt, ...)					\
 ({								\
@@ -41,57 +21,37 @@ struct sock_key{
 })
 
 
-// map de passage de valeur
+typedef struct sock_key sock_key_t;
+struct sock_key{
 
-struct bpf_map_def SEC("maps") tx_id = {
-    .type = BPF_MAP_TYPE_ARRAY,
-    .key_size = sizeof(int),
-    .value_size = sizeof(int), // id
-    .max_entries = 1,
-};
+    __u32 sip4;
+    __u32 dip4;
+    __u32 sport;
+    __u32 dport;
 
-
-// map de mapping id <----> sock_key
-
-struct bpf_map_def SEC("maps") mapping = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(int),                // id
-    .value_size = sizeof(struct sock_key),  // sock_key
-    .max_entries = 20,
-};
-
-// map de redirection
-struct bpf_map_def SEC("maps") hmap = {
-	.type = BPF_MAP_TYPE_SOCKHASH,
-	.key_size = sizeof(struct sock_key),
-	.value_size = sizeof(int),
-	.max_entries = 20,
 };
 
 
 
-void h_add_hmap(struct bpf_sock_ops *skops)
+
+void hk_add_hmap(struct bpf_sock_ops *skops)
 {
-    struct sock_key skey = {};
-    int tx_key, tx_value,cnt_key = 0 , id;   
-
+    /* Extract key */
+    sock_key_t skey = {};  
     skey.dip4 = skops->remote_ip4;
     skey.sip4 = skops->local_ip4;
     skey.dport = skops->remote_port ; 
     skey.sport = bpf_ntohl(skops->local_port) ;
-    
-    // get id for skey
 
-    id = hash_sock(skey);
-
-    // on récupère le compteur
-    //id = bpf_map_lookup_elem(&counter, &cnt_key);  // plus besoin
-
-    bpf_map_update_elem(&mapping, &id, &skey, BPF_ANY);      
-    bpf_sock_hash_update(skops, &hmap, &skey, BPF_NOEXIST);
-
+    /* test */
+    bpf_printk("sport: %d", skops->local_port);
+    if(skops->local_port == C_PORT){
+        int key = 0;
+        bpf_map_update_elem(&sock_key_map, &key, &skey, BPF_ANY);
+    }
+   
+    bpf_sock_hash_update(skops, &hooker_map, &skey, BPF_NOEXIST);
 }
-
 
 SEC("sockops")
 int hk_add_sock(struct bpf_sock_ops *skops)
@@ -104,12 +64,16 @@ int hk_add_sock(struct bpf_sock_ops *skops)
 
     switch(op){
 
-        case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
+        case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB: // pas la peine d'ajouter tous les sockets
+                bpf_printk("serveur\n");
+                hk_add_hmap(skops);
+            break;       
         case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
-
-                h_add_hmap(skops);
+                bpf_printk("client\n");
+                hk_add_hmap(skops);
 
             break;
+       
         default:
             break;
     } 
@@ -117,75 +81,49 @@ int hk_add_sock(struct bpf_sock_ops *skops)
     return 0;
 }
 
-// 1 sk_msg pour msg redirector
+
+
 SEC("sk_msg")
 int hk_msg_redir(struct sk_msg_md *msg)
 {
     __u64 flags = BPF_F_INGRESS;
-    __u32 lport, rport;
-    struct sock_key hsock_key = {};
-    struct sock_key skey = {};
-    
-    int tx_key = 0;
+    __u32 lport;
+    sock_key_t hsock_key = {};  
 
-    
-    
-    //lport = bpf_ntohl(msg->local_port);
-    lport = msg->local_port;
-    // comparaison au niveau du port
-    if(lport == H_PORT){
-        
-        bpf_printk("hooker -> app : port = %d\n", lport);
-        // hooker userspace -> app
-        struct sock_key *value ;
-        int *val_id;
-        int id;
-        
-        // retrieve id app
-        val_id = bpf_map_lookup_elem(&tx_id, &tx_key);
-        if(!val_id)
-            return SK_DROP;
-        id = *val_id;
-        // retrieve sock_key app
-        value = bpf_map_lookup_elem(&mapping, &id);
-        if(!value)
-            return SK_DROP;
-        skey = *value;
+    lport = msg->local_port; // ok
 
-        // redirect to appstruct sock_key skey = {};
-        bpf_msg_redirect_hash(msg, &hmap, &skey, flags);
+    switch(lport){
+
+        case H_PORT:
+           // hooker userpace -> app
+           bpf_printk("hooker -> app\n");
+
+           //retrieve sock_key client
+           int key = 0;
+           sock_key_t *value;
+           sock_key_t c_skey = {};
+           value = bpf_map_lookup_elem(&sock_key_map, &key); // pas optimal
+           if(!value)
+                return SK_DROP;
+           c_skey = *value;
+
+           //redirect data to app
+           bpf_msg_redirect_hash(msg, &hooker_map, &c_skey, flags);
+           break;
+              
+        case C_PORT:
+            
+           // app client -> hooker userspace
+           bpf_msg_redirect_hash(msg, &hooker_map, &hsock_key, flags);
+           break;
+      
+        
+        default:
+            break; //optional
     }
-    else {
-        // app -> hooker userspace
 
-        // get msg sock_key
-        bpf_printk("app -> hooker: app_port = %d\n", lport);
-        skey.dip4 = msg->remote_ip4;
-        skey.sip4 = msg->local_ip4;
-        skey.dport = msg->remote_port ; 
-        skey.sport = bpf_ntohl(msg->local_port); //est-ce que cela ne sera pas problématique ?
-
-        // push header
-       /* int  offset = 0;
-        int len = sizeof(sock_key_t)
-        bpf_msg_push_data(msg, ) */
-
-        // retrieve id app
-        int id;
-        id = hash_sock(skey);
-
-        // give id to hooker
-        bpf_map_update_elem(&tx_id, &tx_key, &id, BPF_EXIST); // for userspace mapping
-
-        // redirect to hooker  
-        bpf_msg_redirect_hash(msg, &hmap, &hsock_key, flags);
-    } 
-    
    
     return SK_PASS;
 } 
-
-
-
 
 char _license[] SEC("license") = "GPL";

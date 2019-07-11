@@ -5,6 +5,8 @@
 # Still depend on a kernel source tree.
 #
 
+
+
 TARGETS := hooker
 TARGETS += test
 
@@ -14,8 +16,15 @@ TEST += tcp-client
 TEST += client-chat
 TEST += server-chat
 
+# Linking with libbpf and libpcap
+# TARGETS_PCAP += xdp_tcpdump
 
-TOOLS_PATH = ./bpf/tools
+
+#CMDLINE_TOOLS := xdp_ddos01_blacklist_cmdline
+#COMMON_H      =  ${CMDLINE_TOOLS:_cmdline=_common.h}
+
+
+TOOLS_PATH = tools
 
 # Files under kernel/samples/bpf/ have a name-scheme:
 # ---------------------------------------------------
@@ -36,7 +45,7 @@ TOOLS_PATH = ./bpf/tools
 #    A library file under tools is compiled and static char *find_cgroup_root(void)
 #
 
-
+# TARGETS_ALL = $(TARGETS) $(TARGETS_PCAP)
 TARGETS_ALL = $(TARGETS)
 
 # Generate file name-scheme based on TARGETS
@@ -44,6 +53,11 @@ KERN_SOURCES = ${TARGETS_ALL:=_kern.c}
 USER_SOURCES = ${TARGETS_ALL:=_user.c}
 KERN_OBJECTS = ${KERN_SOURCES:.c=.o}
 USER_OBJECTS = ${USER_SOURCES:.c=.o}
+
+# Notice: the kbuilddir can be redefined on make cmdline
+# kbuilddir à garder pour l'instant
+#kbuilddir ?= /lib/modules/$(shell uname -r)/build/
+#KERNEL=$(kbuilddir)
 
 KDIR ?= /lib/modules/$(shell uname -r)/source
 ARCH := $(subst x86_64,x86,$(shell arch))
@@ -53,7 +67,7 @@ CFLAGS := -no-pie -g -O2 -Wall
 
 # Local copy of include/linux/bpf.h kept under ./kernel-usr-include
 #
-CFLAGS += -I./bpf/kernel-usr-include/
+CFLAGS += -I./kernel-usr-include/
 ##CFLAGS += -I$(KERNEL)/usr/include
 #
 # Interacting with libbpf
@@ -68,7 +82,10 @@ OBJECTS = $(OBJECT_LOADBPF)
 #
 # The static libbpf library
 LIBBPF = $(TOOLS_PATH)/lib/bpf/libbpf.a
+##LIBBPF = $(TOOLS_PATH)/lib/libbpf/src/libbpf.a
 
+# Allows pointing LLC/CLANG to another LLVM backend, redefine on cmdline:
+#  make LLC=~/git/llvm/build/bin/llc CLANG=~/git/llvm/build/bin/clang
 LLC ?= llc
 CLANG ?= clang
 
@@ -104,6 +121,10 @@ EXTRA_CFLAGS=-Werror
 all: $(TEST) dependencies $(TARGETS_ALL) $(KERN_OBJECTS)
 
 .PHONY: dependencies clean verify_cmds verify_llvm_target_bpf $(CLANG) $(LLC)
+
+# Manually define dependencies to e.g. include files
+# napi_monitor:        napi_monitor.h
+# napi_monitor_kern.o: napi_monitor.h
 
 clean:
 	@find . -type f \
@@ -162,7 +183,7 @@ $(OBJECT_LOADBPF): bpf_load.c bpf_load.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 LIBBPF_SOURCES  = $(TOOLS_PATH)/lib/bpf/*.c
-
+##LIBBPF_SOURCES  = $(TOOLS_PATH)/lib/libbpf/src/*.c
 
 # New ELF-loaded avail in libbpf (in bpf/libbpf.c)
 $(LIBBPF): $(LIBBPF_SOURCES) $(TOOLS_PATH)/lib/bpf/Makefile
@@ -191,3 +212,9 @@ $(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile bpf_util.h
 $(TEST): %: %.o 
 	$(CC) $(CFLAGS) $+ -o '$@'
 
+# Targets that links with libpcap
+# $(TARGETS_PCAP): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile bpf_util.h
+# 	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF) -lpcap
+
+#$(CMDLINE_TOOLS): %: %.c $(OBJECTS) $(LIBBPF) Makefile $(COMMON_H) bpf_util.h
+#	$(CC) -g $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF)
