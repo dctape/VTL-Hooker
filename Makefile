@@ -6,38 +6,11 @@
 #
 
 TARGETS := hooker
-TARGETS += test
 
 
-TEST := tcp-server
-TEST += tcp-client
-TEST += client-chat
-TEST += server-chat
-
-
+BPF_DIR = bpf
 TOOLS_PATH = ./bpf/tools
 
-# Files under kernel/samples/bpf/ have a name-scheme:
-# ---------------------------------------------------
-# The eBPF program is called xxx_kern.c. This is the restricted-C
-# code, that need to be compiled with LLVM/clang, to generate an ELF
-# binary containing the eBPF instructions.
-#
-# The userspace program called xxx_user.c, is a regular C-code
-# program.  It need two external components from kernel tree, from
-# samples/bpf/ and tools/lib/bpf/.
-#
-# 1) When loading the ELF eBPF binary is uses the API load_bpf_file()
-#    via "bpf_load.h" (compiles against a modified local copy of
-#    kernels samples/bpf/bpf_load.c).
-#    (TODO: This can soon be changed, and use loader from tools instead) #####
-#
-# 2) The API for interacting with eBPF comes from tools/lib/bpf/bpf.h.
-#    A library file under tools is compiled and static char *find_cgroup_root(void)
-#
-
-
-TARGETS_ALL = $(TARGETS)
 
 # Generate file name-scheme based on TARGETS
 KERN_SOURCES = ${TARGETS_ALL:=_kern.c}
@@ -63,10 +36,19 @@ CFLAGS += -I$(TOOLS_PATH)/lib
 LDFLAGS= -lelf
 
 # Objects that xxx_user program is linked with:
-OBJECT_LOADBPF = bpf_load.o
-OBJECTS = $(OBJECT_LOADBPF)
-#
+#TODO : optimize this later...
+OBJECT_LOADBPF = ./bpf/bpf_load.o
+OBJECT_ADAPTER = adapter.o
+OBJECT_BPFMANAGER = bpf-manager.o
+OBJECT_UTIL = util.o
+OBJECTS := $(OBJECT_LOADBPF) 
+OBJECTS += $(OBJECT_ADAPTER) 
+OBJECTS += $(OBJECT_BPFMANAGER) 
+OBJECTS += $(OBJECT_UTIL)
+
+
 # The static libbpf library
+# TODO : use libbpf shared 
 LIBBPF = $(TOOLS_PATH)/lib/bpf/libbpf.a
 
 LLC ?= llc
@@ -90,7 +72,7 @@ CLANG_FLAGS = -I. -I$(KDIR)/arch/$(ARCH)/include \
 	-Wno-gnu-variable-sized-type-not-at-end \
 	-Wno-address-of-packed-member -Wno-tautological-compare \
 	-Wno-unknown-warning-option \
-	-include asm_goto_workaround.h \
+	-include $(BPF_DIR)/asm_goto_workaround.h \
 	-O2 -emit-llvm
 
 # TODO: can we remove(?) copy of uapi/linux/bpf.h stored here: ./tools/include/
@@ -101,10 +83,11 @@ CLANG_FLAGS = -I. -I$(KDIR)/arch/$(ARCH)/include \
 
 EXTRA_CFLAGS=-Werror
 
-all: $(TEST) dependencies $(TARGETS_ALL) $(KERN_OBJECTS)
+all: $(TEST) dependencies $(TARGETS) $(KERN_OBJECTS)
 
 .PHONY: dependencies clean verify_cmds verify_llvm_target_bpf $(CLANG) $(LLC)
 
+#TODO : fix clean
 clean:
 	@find . -type f \
 		\( -name '*~' \
@@ -113,10 +96,11 @@ clean:
 		-o -name 'core' \) \
 		-exec rm -vf '{}' \;
 	rm -f $(OBJECTS)
-	rm -f $(TARGETS_ALL)
+	rm -f $(TARGETS)
 	rm -f $(KERN_OBJECTS)
 	rm -f $(USER_OBJECTS)
 	make -C $(TOOLS_PATH)/lib/bpf clean
+
 
 dependencies: verify_llvm_target_bpf linux-src-devel-headers
 
@@ -158,7 +142,7 @@ verify_llvm_target_bpf: verify_cmds
 	else true; fi
 
 # Most xxx_user program still depend on old bpf_load.c
-$(OBJECT_LOADBPF): bpf_load.c bpf_load.h
+$(OBJECT_LOADBPF): ./bpf/bpf_load.c ./bpf/bpf_load.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 LIBBPF_SOURCES  = $(TOOLS_PATH)/lib/bpf/*.c
@@ -167,6 +151,18 @@ LIBBPF_SOURCES  = $(TOOLS_PATH)/lib/bpf/*.c
 # New ELF-loaded avail in libbpf (in bpf/libbpf.c)
 $(LIBBPF): $(LIBBPF_SOURCES) $(TOOLS_PATH)/lib/bpf/Makefile
 	make -C $(TOOLS_PATH)/lib/bpf/ all
+
+#TODO: optimize this later
+$(OBJECT_ADAPTER): adapter.c config.h
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+$(OBJECT_BPFMANAGER): bpf-manager.c config.h
+	$(CC) $(CFLAGS) -o $@ -c $< $(LIBBPF)
+
+$(OBJECT_UTIL): ./lib/util.c
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+
 
 #LPTHREAD = -lpthread
 ##LIBBPF += $(TOOLS_PATH)/lib/libbpf/src/*.o
@@ -180,14 +176,14 @@ $(LIBBPF): $(LIBBPF_SOURCES) $(TOOLS_PATH)/lib/bpf/Makefile
 # unaligned access checks where necessary
 #
 
-$(KERN_OBJECTS): %.o : %.c bpf_helpers.h Makefile
+$(KERN_OBJECTS): %.o : %.c $(BPF_DIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
 	$(CLANG) $(CLANG_FLAGS) -c $< -o ${@:.o=.ll} 
 	$(LLC) -march=bpf -mcpu=$(CPU) -filetype=obj -o $@ ${@:.o=.ll}
 
 
-$(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile bpf_util.h
+$(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile $(BPF_DIR)/bpf_util.h
 	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF) -lpthread
 
-$(TEST): %: %.o 
-	$(CC) $(CFLAGS) $+ -o '$@'
+
+
 

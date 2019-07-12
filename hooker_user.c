@@ -74,7 +74,7 @@ int main(int argc, char*argv[])
     // TODO : revoir cette section du code source
     printf("Attaching bpf program...\n");
 
-    err = bpf_attach_prog_redirector(cgfd);
+    err = bpf_attach_prog_redirector(sock_redir,cgfd);
     if(err != 0){
         bpf_detach_redirector_prog(err, cgfd);
         goto close;

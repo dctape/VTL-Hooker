@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include "../bpf/bpf_helpers.h"
+
 
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))

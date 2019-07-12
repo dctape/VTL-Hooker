@@ -1,6 +1,6 @@
 
 #include "bpf-manager.h"
-#include "./lib/config.h"
+#include "config.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -11,11 +11,14 @@
 #include "./bpf/bpf_load.h"
 #include "./bpf/libbpf.h"
 
-int sock_key_map = map_fd[0];
+int sock_key_map, hooker_map;
+int redirector_sockops_prog, redirector_skmsg_prog; 
+
+/*int sock_key_map = map_fd[0];
 int hooker_map = map_fd[1];
 
 int redirector_sockops_prog = prog_fd[0];
-int redirector_skmsg_prog = prog_fd[1];
+int redirector_skmsg_prog = prog_fd[1]; */
 
 
 /* injecte les programmes eBPF */
@@ -29,7 +32,7 @@ int bpf_inject(char *bpf_filename)
 }
 
 
-int bpf_init_maps(void) // pas vraiment nécessaire
+/* int bpf_init_maps(void) // pas vraiment nécessaire
 {
     __u32 key = 0;
     sock_key_t value = {};
@@ -40,13 +43,19 @@ int bpf_init_maps(void) // pas vraiment nécessaire
     }
 
     return 0; 
-}
+} */
 
 
 int bpf_attach_prog_redirector(int sock_redir, int cgfd) {
 
     
     int err;
+    // TODO : find another way
+    sock_key_map = map_fd[0];
+    hooker_map = map_fd[1];
+
+    redirector_sockops_prog = prog_fd[0];
+    redirector_skmsg_prog = prog_fd[1];
     /* Attach redirector_skmsg program */
     err = bpf_prog_attach(redirector_skmsg_prog, hooker_map, BPF_SK_MSG_VERDICT,0);
     if(err) {   

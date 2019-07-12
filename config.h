@@ -7,7 +7,9 @@
 #define __HK_CONFIG_H
 
 /* globals...change later */
-
+#include <stdio.h>
+//#include <stdlib.h>
+#include <linux/types.h>
 
 #define MAX_DATA_SIZE     100 // TODO : Find the good size...
 

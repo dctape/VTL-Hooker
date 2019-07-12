@@ -12,7 +12,7 @@
 #include "./bpf/bpf_endian.h"
 
 #include "config.h"
-
+#include "./lib/maps.h"
 
 #define bpf_printk(fmt, ...)					\
 ({								\
