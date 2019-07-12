@@ -39,6 +39,7 @@
 #include "./lib/util.h"
 #include "adapter.h"
 #include "bpf-manager.h"
+#include "udp.h"
 
 #define HOOKER_BPF_FILENAME        "hooker_kern.o"
 
@@ -95,6 +96,10 @@ int main(int argc, char*argv[])
             
         /* Afficher ces données */
         printf("%s\n", buf);
+
+        /* envoyer les données sur udp */
+
+        /* recevoir les données sur udp */
               
         /* Les renvoyer à l'application émettrice */
         err = adapter_sendto_redirector(buf);
