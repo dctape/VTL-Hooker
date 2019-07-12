@@ -3,10 +3,10 @@
 #define __HK_ADAPTER_H
 
 #include <stdlib.h>
+#include "config.h"
 
-#define MAXDATASIZE 100 // TODO : Find the good size...
-#define H_SERV_PORT 10000 // TODO : change name later...
-#define H_PORT 10002
+extern int sock_server; 
+extern int sock_redir;
 
 
 typedef struct sockaddr_in sockaddr_in_t;

@@ -7,6 +7,7 @@
 
 #include "adapter.h"
 
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -15,15 +16,15 @@
 #include <netinet/in.h>
 #include <errno.h>
 
+int sock_server;
+int sock_redir;
 
-/* globals...change later */
-int sock_server, sock_redir;
 
 
 /* wrapper pour la récupération des données de l'application legacy */
 int getdata_from_redirector(char *rcv_buf)
 {   
-    return recv(sock_redir, rcv_buf, MAXDATASIZE, 0); //sock_redir global
+    return recv(sock_redir, rcv_buf, MAX_DATA_SIZE, 0); //sock_redir global
 }
 
 /* wrapper pour l'envoi des données vers l'application legacy */
@@ -74,7 +75,7 @@ int adapter_init_sock(void)
     memset(&addr, 0, sizeof(struct sockaddr_in));
     addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr("0.0.0.0");
-    addr.sin_port = htons(H_SERV_PORT);
+    addr.sin_port = htons(PORT_SERVER_HOOKER);
 	err = bind(sock_server, (struct sockaddr *)&addr, sizeof(addr));
 	if (err < 0) {
 		perror("bind server failed()\n");
@@ -82,7 +83,7 @@ int adapter_init_sock(void)
 	}
     
     // listen server socket
-    addr.sin_port = htons(H_SERV_PORT);
+    addr.sin_port = htons(PORT_SERVER_HOOKER);
 	err = listen(sock_server, 32);
 	if (err < 0) {
 		perror("listen server failed()\n");
@@ -97,7 +98,7 @@ int adapter_init_sock(void)
     memset(&caddr, 0, sizeof(struct sockaddr_in));
     caddr.sin_family = AF_INET;
 	caddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    caddr.sin_port = htons(H_PORT);
+    caddr.sin_port = htons(PORT_SOCK_REDIR);
 	err = bind(sock_redir, (struct sockaddr *)&caddr, sizeof(caddr));
 	if (err < 0) {
 		perror("bind socket failed()\n");
@@ -105,7 +106,7 @@ int adapter_init_sock(void)
 	}
 
     // Initiate Connect 
-	addr.sin_port = htons(H_SERV_PORT);
+	addr.sin_port = htons(PORT_SERVER_HOOKER );
 	err = connect(sock_redir, (struct sockaddr *)&addr, sizeof(addr));
 	if (err < 0 && errno != EINPROGRESS) {
 		perror("connect socket client failed()\n");
@@ -136,9 +137,9 @@ int adapter_config(void)
 
     /* initialisater les maps */ 
     //TODO : change position later
-    ret = hk_init_map();
+    /* ret = hk_init_map();
     if(ret < 0)
-        return ret;
+        return ret; */
 
     return 0;
 }

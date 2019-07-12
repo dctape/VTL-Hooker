@@ -1,17 +1,18 @@
 /*
  *
- * test program ebpf
+ * hooker ebpf program
  *  
  * 
 */
 
 //#include <uapi/linux/bpf.h>
+
 #include <linux/bpf.h>
 #include "./bpf/bpf_helpers.h"
 #include "./bpf/bpf_endian.h"
 
-#define H_PORT                      10002
-#define C_PORT                      9092
+#include "config.h"
+
 
 #define bpf_printk(fmt, ...)					\
 ({								\
@@ -19,19 +20,6 @@
 	       bpf_trace_printk(____fmt, sizeof(____fmt),	\
 				##__VA_ARGS__);			\
 })
-
-
-typedef struct sock_key sock_key_t;
-struct sock_key{
-
-    __u32 sip4;
-    __u32 dip4;
-    __u32 sport;
-    __u32 dport;
-
-};
-
-
 
 
 void hk_add_hmap(struct bpf_sock_ops *skops)
@@ -45,7 +33,7 @@ void hk_add_hmap(struct bpf_sock_ops *skops)
 
     /* test */
     bpf_printk("sport: %d", skops->local_port);
-    if(skops->local_port == C_PORT){
+    if(skops->local_port == PORT_CLIENT_TCP){
         int key = 0;
         bpf_map_update_elem(&sock_key_map, &key, &skey, BPF_ANY);
     }
@@ -54,7 +42,7 @@ void hk_add_hmap(struct bpf_sock_ops *skops)
 }
 
 SEC("sockops")
-int hk_add_sock(struct bpf_sock_ops *skops)
+int redirector_sockops(struct bpf_sock_ops *skops)
 {
     /* add passive or active established socket  to hooker sockhash  */
   
@@ -67,7 +55,8 @@ int hk_add_sock(struct bpf_sock_ops *skops)
         case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB: // pas la peine d'ajouter tous les sockets
                 bpf_printk("serveur\n");
                 hk_add_hmap(skops);
-            break;       
+            break; 
+
         case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
                 bpf_printk("client\n");
                 hk_add_hmap(skops);
@@ -84,7 +73,7 @@ int hk_add_sock(struct bpf_sock_ops *skops)
 
 
 SEC("sk_msg")
-int hk_msg_redir(struct sk_msg_md *msg)
+int redirector_skmsg(struct sk_msg_md *msg) // TODO : use a better name...
 {
     __u64 flags = BPF_F_INGRESS;
     __u32 lport;
@@ -94,7 +83,7 @@ int hk_msg_redir(struct sk_msg_md *msg)
 
     switch(lport){
 
-        case H_PORT:
+        case PORT_SOCK_REDIR:
            // hooker userpace -> app
            bpf_printk("hooker -> app\n");
 
@@ -111,7 +100,7 @@ int hk_msg_redir(struct sk_msg_md *msg)
            bpf_msg_redirect_hash(msg, &hooker_map, &c_skey, flags);
            break;
               
-        case C_PORT:
+        case PORT_CLIENT_TCP:
             
            // app client -> hooker userspace
            bpf_msg_redirect_hash(msg, &hooker_map, &hsock_key, flags);
