@@ -42,12 +42,13 @@
 #include "udp.h"
 
 #define HOOKER_BPF_FILENAME        "hooker_kern.o"
+#define sock 2  // TODO : delete after test...
 
 #define CLIENT  1 // temporary
 #define SERVER 2
 
 int cgfd = 0; //TODO: use a better way...
-int host;
+int host = SERVER;
 
 /* envoie  des datas par le hooker */
 void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication

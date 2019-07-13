@@ -21,6 +21,7 @@
 				##__VA_ARGS__);			\
 })
 
+#define sock 2
 
 void hk_add_hmap(struct bpf_sock_ops *skops)
 {
@@ -33,7 +34,7 @@ void hk_add_hmap(struct bpf_sock_ops *skops)
 
     /* test */
     bpf_printk("sport: %d", skops->local_port);
-    if(skops->local_port == PORT_CLIENT_TCP){
+    if(skops->local_port == PORT_SERVER_TCP){
         int key = 0;
         bpf_map_update_elem(&sock_key_map, &key, &skey, BPF_ANY);
     }

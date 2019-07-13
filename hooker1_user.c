@@ -47,7 +47,7 @@
 #define SERVER 2
 
 int cgfd = 0; //TODO: use a better way...
-int host;
+int host = CLIENT;
 
 /* envoie  des datas par le hooker */
 void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication

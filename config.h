@@ -15,7 +15,10 @@
 
 #define PORT_SERVER_HOOKER     10000 // TODO : change name later...
 #define PORT_SOCK_REDIR          10002
+
+#define PORT_SERVER_TCP          9091
 #define PORT_CLIENT_TCP          9092
+         
 
 
 typedef struct sock_key sock_key_t; // TODO : find a better file ...
