@@ -5,7 +5,8 @@
 # Still depend on a kernel source tree.
 #
 
-TARGETS := hooker
+TARGETS := hooker1
+TARGETS += hooker2
 
 
 BPF_DIR = bpf
@@ -41,10 +42,12 @@ OBJECT_LOADBPF = ./bpf/bpf_load.o
 OBJECT_ADAPTER = adapter.o
 OBJECT_BPFMANAGER = bpf-manager.o
 OBJECT_UTIL = util.o
+OBJECT_UDP = udp.o
 OBJECTS := $(OBJECT_LOADBPF) 
 OBJECTS += $(OBJECT_ADAPTER) 
 OBJECTS += $(OBJECT_BPFMANAGER) 
 OBJECTS += $(OBJECT_UTIL)
+OBJECTS += $(OBJECT_UDP)
 
 
 # The static libbpf library
@@ -162,7 +165,8 @@ $(OBJECT_BPFMANAGER): bpf-manager.c config.h
 $(OBJECT_UTIL): ./lib/util.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-
+$(OBJECT_UDP): udp.c config.h
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 #LPTHREAD = -lpthread
 ##LIBBPF += $(TOOLS_PATH)/lib/libbpf/src/*.o

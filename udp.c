@@ -5,6 +5,7 @@
 
 #include "udp.h"
 
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -70,11 +71,11 @@ int udp_config(void)
     
     udpsock1_to.sin_family = AF_INET;
     udpsock1_to.sin_port = htons(udpsock2_port);
-    udpsock1_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
+    udpsock1_to.sin_addr.s_addr = inet_addr(udpsock1_to_addr); // TODO : serv addr
 
     udpsock2_to.sin_family = AF_INET;
     udpsock2_to.sin_port = htons(udpsock1_port);
-    udpsock2_to.sin_addr.s_addr = inet_addr(serv_addr); // TODO : serv addr
+    udpsock2_to.sin_addr.s_addr = inet_addr(udpsock2_to_addr); // TODO : serv addr
 
 
     return 0;
@@ -91,7 +92,7 @@ int udp_rcv(int sockudp, char *data, sockaddr_in_t from)
 {   
     // attention to MAXDATASIZE
     int fromsize = sizeof(from);
-    return recvfrom(sockudp, data, MAXDATASIZE, 0 ,
+    return recvfrom(sockudp, data, MAX_DATA_SIZE, 0 ,
                                 (struct sockaddr*)&from, (socklen_t *)&fromsize);
 
 }

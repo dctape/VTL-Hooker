@@ -3,7 +3,7 @@
 #define __HK_ADAPTER_H
 
 #include <stdlib.h>
-#include "config.h"
+#include "config.h" // est-ce utile ici ?
 
 extern int sock_server; 
 extern int sock_redir;
@@ -12,8 +12,8 @@ extern int sock_redir;
 typedef struct sockaddr_in sockaddr_in_t;
 
 
-int getdata_from_redirector(char *rcv_buf);
-int senddata_to_redirector(char *snd_buf);
+int get_data_from_redirector(char *rcv_buf);
+int send_data_to_redirector(char *snd_buf);
 int adapter_init_sock(void);
 
 int adapter_config(void);

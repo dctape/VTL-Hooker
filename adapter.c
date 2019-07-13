@@ -22,13 +22,13 @@ int sock_redir;
 
 
 /* wrapper pour la récupération des données de l'application legacy */
-int getdata_from_redirector(char *rcv_buf)
+int get_data_from_redirector(char *rcv_buf)
 {   
     return recv(sock_redir, rcv_buf, MAX_DATA_SIZE, 0); //sock_redir global
 }
 
 /* wrapper pour l'envoi des données vers l'application legacy */
-int senddata_to_redirector(char *snd_buf)
+int send_data_to_redirector(char *snd_buf)
 {
     return send(sock_redir, snd_buf, strlen(snd_buf), 0);
 }
@@ -154,7 +154,7 @@ int adapter_recvfrom_redirector(char *rcv_data) // TODO : change name later...
     //bzero(rcv_data, sizeof(rcv_data));
     memset(rcv_data, 0, sizeof(rcv_data));
 
-    numbytes = getdata_from_redirector(rcv_data);
+    numbytes = get_data_from_redirector(rcv_data);
     if(numbytes < 0) {
         perror("Get data from redirector failed\n"); // TODO : change error message
         return errno;
@@ -169,7 +169,7 @@ int adapter_recvfrom_redirector(char *rcv_data) // TODO : change name later...
 int adapter_sendto_redirector(char *snd_data)
 {
     int ret;
-    ret = senddata_to_redirector(snd_data);
+    ret = send_data_to_redirector(snd_data);
     if(ret < 0) {
         perror("Send data to redirector failed\n"); //TODO : change error message
         return errno;
