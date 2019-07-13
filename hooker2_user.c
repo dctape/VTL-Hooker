@@ -41,7 +41,7 @@
 #include "bpf-manager.h"
 #include "udp.h"
 
-#define HOOKER_BPF_FILENAME        "hooker_kern.o"
+#define HOOKER_BPF_FILENAME        "hooker2_kern.o"
 #define sock 2  // TODO : delete after test...
 
 #define CLIENT  1 // temporary
@@ -138,7 +138,7 @@ int main(int argc, char*argv[])
         /* loading bpf program ~ redirector */
         printf("Loading bpf program redirector in kernel...\n");
         status = bpf_inject(HOOKER_BPF_FILENAME); 
-        if(!status)
+        if(status)
             goto out;
 
 
@@ -151,12 +151,12 @@ int main(int argc, char*argv[])
 
         /* Configure adapter */
         status = adapter_config();
-        if(!status)
+        if(status)
             goto close;
 
         /* Configure communication over udp...change */
         status = udp_config();
-        if(!status)
+        if(status)
             goto close;
         
         
