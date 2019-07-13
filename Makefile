@@ -14,8 +14,8 @@ TOOLS_PATH = ./bpf/tools
 
 
 # Generate file name-scheme based on TARGETS
-KERN_SOURCES = ${TARGETS_ALL:=_kern.c}
-USER_SOURCES = ${TARGETS_ALL:=_user.c}
+KERN_SOURCES = ${TARGETS:=_kern.c}
+USER_SOURCES = ${TARGETS:=_user.c}
 KERN_OBJECTS = ${KERN_SOURCES:.c=.o}
 USER_OBJECTS = ${USER_SOURCES:.c=.o}
 
