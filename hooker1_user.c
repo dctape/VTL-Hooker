@@ -64,7 +64,7 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
                 //goto detach;
                 return NULL;
         }
-
+        printf("Redirector : %s", buf);
         /* envoie des datas */
         //TODO : faire un switch pour les différents protocoles sur lesquels envoyés
         if(host == CLIENT){
@@ -115,7 +115,7 @@ void *adapter_rcv(void *arg){
                 return NULL;
             }
         }
-
+        printf("udp_rcv : %s", buf);
         /* envoie des datas à redirector */
         err = adapter_sendto_redirector(buf);
         if(err < 0){
