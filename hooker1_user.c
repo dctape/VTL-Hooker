@@ -53,7 +53,7 @@ int host = CLIENT;
 void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
     
     int err;
-    char buf[MAX_DATA_SIZE];
+    char buf[MAX_DATA_SIZE]; //TODO : instead use malloc()
 
     while (1)
     {
@@ -89,9 +89,10 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
 }
 
 /* reception des datas par le hooker */
+//TODO : error code
 void *adapter_rcv(void *arg){
 
-    int err;
+    int numBytes;
     char buf[MAX_DATA_SIZE];
 
     
@@ -101,24 +102,25 @@ void *adapter_rcv(void *arg){
         /* reception des datas sur udp ou udp-lite : utiliser switch  */
         if(host == CLIENT){
 
-            err = udp_rcv(udpsock1, buf, udpsock1_to);
-            if (err < 0){
+            numBytes = udp_rcv(udpsock1, buf, udpsock1_to);
+            if (numBytes < 0){
                 perror("rcv data from server failed\n");
                 return NULL;
             }
         }
         else if (host == SERVER)
         {
-            err = udp_rcv(udpsock2, buf, udpsock2_to);
-            if (err < 0){
+            numBytes = udp_rcv(udpsock2, buf, udpsock2_to);
+            if (numBytes < 0){
                 perror("rcv data from client failed\n");
                 return NULL;
             }
         }
+        buf[numBytes] = '\0';
         printf("udp_rcv : %s", buf);
         /* envoie des datas à redirector */
-        err = adapter_sendto_redirector(buf);
-        if(err < 0){
+        numBytes = adapter_sendto_redirector(buf);
+        if(numBytes < 0){
                return NULL;
         }
 

@@ -26,7 +26,8 @@ void app(int sockfd)
 	int n, numbytes;
     printf("Reception from data sent by chat client tcp:\n");
 	for(;;){
-		bzero(rcv_buf, sizeof(rcv_buf));
+		//bzero(rcv_buf, sizeof(rcv_buf));
+        memset(rcv_buf, 0, sizeof(rcv_buf));
         /* Lecture du message du client */
         if((numbytes = recv(sockfd, rcv_buf, MAXDATASIZE, 0)) == -1){
 			perror("recv");

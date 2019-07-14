@@ -31,7 +31,8 @@ void app(int sockfd)
 	printf("Début de la conversation. \n");
 	//printf("Client : Envoi des données...\n");
 	for(;;){
-		bzero(snd_buf, sizeof(snd_buf));
+		//bzero(snd_buf, sizeof(snd_buf));
+		memset(snd_buf, 0, sizeof(snd_buf));
 		n  = 0;
 		printf("Client : ");
 		//printf("Client : Envoi des données...\n");
