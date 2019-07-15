@@ -75,7 +75,10 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
         //TODO : faire un switch pour les différents protocoles sur lesquels envoyés
 
         /* copy data from hooker_buffer to io_buffer : is it optimal ? */
-        memcpy(io_buffer, hooker_buffer, strlen(hooker_buffer));
+        if(memcpy(io_buffer, hooker_buffer, strlen(hooker_buffer)) == NULL){
+            fprintf(stderr, "Error memcpy\n");
+            return NULL;
+        }
 
         /* send data to host */
         if(host == CLIENT){

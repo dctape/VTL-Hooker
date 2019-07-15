@@ -138,7 +138,10 @@ void *adapter_rcv(void *arg){
 
         /* copy data from io_buffer to hooker_buffer */
 
-        memcpy(hooker_buffer, io_buffer, strlen(io_buffer));
+        if(memcpy(hooker_buffer, io_buffer, strlen(io_buffer)) == NULL){
+            fprintf(stderr, "Error memcpy\n");
+            return NULL;
+        }
         /* envoie des datas à redirector */
         numBytes = adapter_sendto_redirector(hooker_buffer);
         if(numBytes < 0){
