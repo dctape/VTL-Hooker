@@ -43,7 +43,8 @@
 
 #define HOOKER_BPF_FILENAME        "hooker1_kern.o"
 
-#define CLIENT  1 // temporary
+// temporary
+#define CLIENT  1 
 #define SERVER  2
 
 int cgfd = 0; //TODO: use a better way...
@@ -51,8 +52,11 @@ int host = CLIENT;
 
 #define IO_BUFSIZE  1024
 
-/* envoie  des datas par le hooker */
-void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
+/* send data over an other protocol */
+// hackish way : for now, not very portable, depend on host: client or server
+//TODO : use switch for handle the different used protocols
+// TODO: handle error code
+void *adapter_snd(void *arg){ 
     
     int numBytes;
     char *io_buffer;
@@ -61,18 +65,14 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
     io_buffer = (char *)malloc(IO_BUFSIZE);
     while (1)
     {
-         /* reception des données par adapter de redirector */
+         /* data (+ metadata) received by adapter from redirector */
         numBytes = adapter_recvfrom_redirector(hooker_buffer);
         if(numBytes < 0){ // TODO: change this later...
-                //err = ERR_REDIRECTOR_SOCKOPS;
-                //goto detach;
                 free(io_buffer); 
                 return NULL;
         }
 
-        fprintf(stderr,"Redirector : %s", hooker_buffer);
-        /* envoie des datas */
-        //TODO : faire un switch pour les différents protocoles sur lesquels envoyés
+        fprintf(stderr,"Redirector : %s", hooker_buffer); // for tests
 
         /* copy data from hooker_buffer to io_buffer : is it optimal ? */
         if(memcpy(io_buffer, hooker_buffer, strlen(hooker_buffer)) == NULL){
@@ -81,6 +81,7 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
         }
 
         fprintf(stderr,"io_buffer : %s", io_buffer);
+
         /* send data to host */
         if(host == CLIENT){
 
@@ -103,11 +104,14 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
         fprintf(stderr,"numBytes : %d", numBytes);
     }
 
-    //free(io_buffer);    
+    free(io_buffer); // is it compulsory ?   
 }
 
-/* reception des datas par le hooker */
-//TODO : error code
+
+/* receive data over an other protocol */
+// hackish way : for now, not very portable, depend on host: client or server
+//TODO : use switch for handle the different used protocols
+//TODO : handle error code
 void *adapter_rcv(void *arg){
 
     int numBytes;
@@ -117,7 +121,7 @@ void *adapter_rcv(void *arg){
     io_buffer = (char *)malloc(IO_BUFSIZE);
     while (1)
     {
-        /* reception des datas sur udp ou udp-lite : utiliser switch  */
+        /* receive data over udp or udp-lite */
         if(host == CLIENT){
 
             numBytes = udp_rcv(udpsock1, io_buffer, IO_BUFSIZE - 1, udpsock1_to);
@@ -136,14 +140,14 @@ void *adapter_rcv(void *arg){
                 return NULL;
             }
         }
-        //TODO: mettre à zéro le buffer et ajouter '\0'
+
         io_buffer[numBytes] = '\0';
-        printf("udp_rcv : %s", io_buffer);
+        printf("udp_rcv : %s", io_buffer); // for tests 
 
         /* copy data from io_buffer to hooker_buffer */
-
         memcpy(hooker_buffer, io_buffer, strlen(io_buffer));
-        /* envoie des datas à redirector */
+
+        /* send data to redirector */
         numBytes = adapter_sendto_redirector(hooker_buffer);
         if(numBytes < 0){
                 free(io_buffer);
