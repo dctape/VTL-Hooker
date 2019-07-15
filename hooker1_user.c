@@ -44,7 +44,7 @@
 #define HOOKER_BPF_FILENAME        "hooker1_kern.o"
 
 #define CLIENT  1 // temporary
-#define SERVER 2
+#define SERVER  2
 
 int cgfd = 0; //TODO: use a better way...
 int host = CLIENT;

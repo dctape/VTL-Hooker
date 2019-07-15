@@ -126,7 +126,7 @@ void *adapter_rcv(void *arg){
         }
         else if (host == SERVER)
         {
-            numBytes = udp_rcv(udpsock1, io_buffer, IO_BUFSIZE - 1, udpsock1_to);
+            numBytes = udp_rcv(udpsock2, io_buffer, IO_BUFSIZE - 1, udpsock2_to);
             if (numBytes < 0){
                 perror("rcv data from client failed\n");
                 //free(io_buffer);
