@@ -88,11 +88,11 @@ int udp_snd(int sockudp, char *data, sockaddr_in_t to)
                 (const struct sockaddr *) &to, sizeof(to));
 }
 
-int udp_rcv(int sockudp, char *data, sockaddr_in_t from)
+int udp_rcv(int sockudp, char *data, ssize_t data_size, sockaddr_in_t from)
 {   
     // attention to MAXDATASIZE
     int fromsize = sizeof(from);
-    return recvfrom(sockudp, data, MAX_DATA_SIZE, 0 ,
+    return recvfrom(sockudp, data, data_size, 0 ,
                                 (struct sockaddr*)&from, (socklen_t *)&fromsize);
 
 }

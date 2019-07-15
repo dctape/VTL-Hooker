@@ -50,79 +50,100 @@
 int cgfd = 0; //TODO: use a better way...
 int host = SERVER;
 
+#define IO_BUFSIZE  1024
+
+
 /* envoie  des datas par le hooker */
 void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
     
-    int err;
-    char buf[MAX_DATA_SIZE];
+    int numBytes;
+    char *io_buffer;
+    char hooker_buffer[MAX_DATA_SIZE];
 
+    io_buffer = (char *)malloc(IO_BUFSIZE);
     while (1)
     {
          /* reception des données par adapter de redirector */
-        err = adapter_recvfrom_redirector(buf);
-        if(err < 0){ // TODO: change this later...
+        numBytes = adapter_recvfrom_redirector(hooker_buffer);
+        if(numBytes < 0){ // TODO: change this later...
                 //err = ERR_REDIRECTOR_SOCKOPS;
                 //goto detach;
+                free(io_buffer); 
                 return NULL;
         }
 
-        printf("Redirector : %s", buf);
+        fprintf(stderr,"Redirector : %s", hooker_buffer);
         /* envoie des datas */
         //TODO : faire un switch pour les différents protocoles sur lesquels envoyés
+
+        /* copy data from hooker_buffer to io_buffer : is it optimal ? */
+        memcpy(io_buffer, hooker_buffer, strlen(hooker_buffer));
+
+        /* send data to host */
         if(host == CLIENT){
 
-            err = udp_snd(udpsock1, buf, udpsock1_to);
-            if (err < 0){
+            numBytes = udp_snd(udpsock1, io_buffer, udpsock1_to);
+            if (numBytes < 0){
                 perror("Send data to server failed\n");
+                free(io_buffer); 
                 return NULL;
             }
         }
         else if (host == SERVER)
         {
-            err = udp_snd(udpsock2, buf, udpsock2_to);
-            if (err < 0){
+            numBytes = udp_snd(udpsock2, io_buffer, udpsock2_to);
+            if (numBytes < 0){
                 perror("Send data to client failed\n");
+                free(io_buffer); 
                 return NULL;
             }
         }
     }
-        
 
+    //free(io_buffer);    
 }
 
 /* reception des datas par le hooker */
 void *adapter_rcv(void *arg){
 
     int numBytes;
-    char buf[MAX_DATA_SIZE];
-
+    char *io_buffer;
+    char hooker_buffer[MAX_DATA_SIZE];
     
-
+    io_buffer = (char *)malloc(IO_BUFSIZE);
     while (1)
     {
         /* reception des datas sur udp ou udp-lite : utiliser switch  */
         if(host == CLIENT){
 
-            numBytes = udp_rcv(udpsock1, buf, udpsock1_to);
+            numBytes = udp_rcv(udpsock1, io_buffer, IO_BUFSIZE - 1, udpsock1_to);
             if (numBytes < 0){
                 perror("rcv data from server failed\n");
+                free(io_buffer);
                 return NULL;
             }
         }
         else if (host == SERVER)
         {
-            numBytes = udp_rcv(udpsock2, buf, udpsock2_to);
+            numBytes = udp_rcv(udpsock1, io_buffer, IO_BUFSIZE - 1, udpsock1_to);
             if (numBytes < 0){
                 perror("rcv data from client failed\n");
+                free(io_buffer);
                 return NULL;
             }
         }
         //TODO: mettre à zéro le buffer et ajouter '\0'
-        printf("udp_rcv : %s", buf);
+        io_buffer[numBytes] = '\0';
+        printf("udp_rcv : %s", io_buffer);
+
+        /* copy data from io_buffer to hooker_buffer */
+
+        memcpy(hooker_buffer, io_buffer, strlen(io_buffer));
         /* envoie des datas à redirector */
-        numBytes = adapter_sendto_redirector(buf);
+        numBytes = adapter_sendto_redirector(hooker_buffer);
         if(numBytes < 0){
-               return NULL;
+                free(io_buffer);
+                return NULL;
         }
 
     }
