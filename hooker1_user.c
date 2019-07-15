@@ -80,6 +80,7 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
             return NULL;
         }
 
+        fprintf(stderr,"io_buffer : %s", io_buffer);
         /* send data to host */
         if(host == CLIENT){
 
@@ -99,6 +100,7 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
                 return NULL;
             }
         }
+        fprintf(stderr,"numBytes : %d", numBytes);
     }
 
     //free(io_buffer);    

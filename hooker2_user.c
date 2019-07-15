@@ -133,9 +133,10 @@ void *adapter_rcv(void *arg){
                 return NULL;
             }
         }
+        fprintf(stderr, "numBytes : %d", numBytes);
         //TODO: mettre à zéro le buffer et ajouter '\0'
         io_buffer[numBytes] = '\0';
-        printf("udp_rcv : %s", io_buffer);
+        fprintf(stderr, "udp_rcv : %s", io_buffer);
 
         /* copy data from io_buffer to hooker_buffer */
 
