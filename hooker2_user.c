@@ -107,10 +107,11 @@ void *adapter_snd(void *arg){ // a  hackish way to avoid code duplication
 void *adapter_rcv(void *arg){
 
     int numBytes;
-    char *io_buffer;
+    char io_buffer[IO_BUFSIZE];
+    //char *io_buffer;
     char hooker_buffer[MAX_DATA_SIZE];
     
-    io_buffer = (char *)malloc(IO_BUFSIZE);
+    //io_buffer = (char *)malloc(IO_BUFSIZE);
     while (1)
     {
         /* reception des datas sur udp ou udp-lite : utiliser switch  */
@@ -119,7 +120,7 @@ void *adapter_rcv(void *arg){
             numBytes = udp_rcv(udpsock1, io_buffer, IO_BUFSIZE - 1, udpsock1_to);
             if (numBytes < 0){
                 perror("rcv data from server failed\n");
-                free(io_buffer);
+                //free(io_buffer);
                 return NULL;
             }
         }
@@ -128,7 +129,7 @@ void *adapter_rcv(void *arg){
             numBytes = udp_rcv(udpsock1, io_buffer, IO_BUFSIZE - 1, udpsock1_to);
             if (numBytes < 0){
                 perror("rcv data from client failed\n");
-                free(io_buffer);
+                //free(io_buffer);
                 return NULL;
             }
         }
@@ -145,7 +146,7 @@ void *adapter_rcv(void *arg){
         /* envoie des datas à redirector */
         numBytes = adapter_sendto_redirector(hooker_buffer);
         if(numBytes < 0){
-                free(io_buffer);
+                //free(io_buffer);
                 return NULL;
         }
 
