@@ -20,14 +20,15 @@
 
 #include "./bpf/libbpf.h"
 
-
-static  int verbose = 1;
-//static const char *mapfile 
+static int verbose = 1;
+//static const char *mapfile  --- Used maps
 
 //paramétrage commmande tc
 #define CMD_MAX 	2048
 #define CMD_MAX_TC	256
 static char tc_cmd[CMD_MAX_TC] = "tc";
+
+#define TC_BPF_FILE         "launcher_tc_kern.o"
 
 
 /*
@@ -127,4 +128,64 @@ static int tc_remove_egress(const char* dev)
 		exit(EXIT_FAILURE);
 	}
 	return ret;
+}
+
+static char ingress_ifname[IF_NAMESIZE];
+static char egress_ifname[IF_NAMESIZE];
+static char buf_ifname[IF_NAMESIZE] = "(unknown-dev)";
+
+// Why ???
+bool validate_ifname(const char* input_ifname, char *output_ifname)
+{
+	size_t len;
+	int i;
+
+	len = strlen(input_ifname);
+	if (len >= IF_NAMESIZE) {
+		return false;
+	}
+	for (i = 0; i < len; i++) {
+		char c = input_ifname[i];
+
+		if (!(isalpha(c) || isdigit(c)))
+			return false;
+	}
+	strncpy(output_ifname, input_ifname, len);
+	return true;
+}
+
+int main(int argc, char **argv)
+{   
+    
+    int egress_ifindex = -1;
+    egress_ifindex = if_nametoindex(egress_ifname); //why ??
+    
+    // validate egress_ifname
+    if (!(egress_ifindex)){ //TODO : change this part later...
+				fprintf(stderr,
+					"ERR: --egress \"%s\" not real dev\n",
+					egress_ifname);
+				return EXIT_FAILURE;
+	}
+   
+    /* inject tc-bpf-file in the kernel */
+    printf("TC attach BPF object %s to device %s\n",
+			       TC_BPF_FILE, egress_ifname);
+    
+    if (tc_egress_attach_bpf(egress_ifname, TC_BPF_FILE)) {
+			fprintf(stderr, "ERR: TC attach failed\n");
+			exit(EXIT_FAILURE);
+	}
+
+    /* sleep for a specific time */
+    int nb_sec = 10;
+    printf("Sleep for %d sec\n", nb_sec);   
+    sleep(nb_sec);
+
+    /*  remove tc-bpf program */
+    printf("TC remove tc-bpf program on device %s\n", egress_ifname);
+    tc_remove_egress(egress_ifname);
+
+
+    return 0;
 }
