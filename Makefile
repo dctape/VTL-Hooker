@@ -186,6 +186,9 @@ $(OBJECT_UDP): udp.c config.h
 # unaligned access checks where necessary
 #
 
+$(TC_KERN_OBJECTS): %
+
+
 $(KERN_OBJECTS): %.o : %.c $(BPF_DIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
 	$(CLANG) $(CLANG_FLAGS) -c $< -o ${@:.o=.ll} 
 	$(LLC) -march=bpf -mcpu=$(CPU) -filetype=obj -o $@ ${@:.o=.ll}
