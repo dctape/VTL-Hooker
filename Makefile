@@ -9,6 +9,8 @@ TARGETS := hooker1
 TARGETS += hooker2
 
 
+
+
 BPF_DIR = bpf
 TOOLS_PATH = ./bpf/tools
 
@@ -18,6 +20,10 @@ KERN_SOURCES = ${TARGETS:=_kern.c}
 USER_SOURCES = ${TARGETS:=_user.c}
 KERN_OBJECTS = ${KERN_SOURCES:.c=.o}
 USER_OBJECTS = ${USER_SOURCES:.c=.o}
+
+TC_KERN_OBJECTS := launcher_tc_kern.o
+
+#add tc_bpf_kern to KERN_OBJECTS
 
 KDIR ?= /lib/modules/$(shell uname -r)/source
 ARCH := $(subst x86_64,x86,$(shell arch))
