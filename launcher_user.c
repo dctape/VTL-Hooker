@@ -18,9 +18,14 @@
 #include <net/if.h>
 #include <time.h>
 
-#include "./bpf/libbpf.h"
+#include <linux/ip.h>
 
-static int verbose = 1;
+#include <linux/bpf.h>
+#include "./bpf/bpf_load.h"
+#include "./bpf/libbpf.h"
+#include "bpf-manager.h"
+
+static int verbose = 1; // TODO : delete later...
 //static const char *mapfile  --- Used maps
 
 //paramétrage commmande tc
@@ -28,9 +33,27 @@ static int verbose = 1;
 #define CMD_MAX_TC	256
 static char tc_cmd[CMD_MAX_TC] = "tc";
 
+//paramétrage raw sockets
+#define PCKT_LEN	8192 //TODO: find an ideal length.
+
 #define TC_BPF_FILE         "launcher_tc_kern.o"
 
+#define LAUNCHER_BPF_FILE	"launcher_kern.o"
 
+//TODO :
+// - put in config file
+// - make it interactive and optimal
+static char tc_ingress_ifname[IF_NAMESIZE];
+static char tc_egress_ifname[IF_NAMESIZE] = "ens33";
+static char xdp_ifname[IF_NAMESIZE] = "ens33"; 
+static char buf_ifname[IF_NAMESIZE] = "(unknown-dev)";
+
+struct vtlhdr{
+
+	int value;
+	//TODO: add other members according use cases
+
+};
 /*
  * Prototype kernel :
  * TC require attaching the bpf-object via the TC cmdline tool.
@@ -46,7 +69,7 @@ static char tc_cmd[CMD_MAX_TC] = "tc";
  */
 
 
-/* tc egress attach */
+/* Attach bpf program on tc egress path */
 static int tc_egress_attach_bpf(const char* dev, const char* bpf_obj)
 {
 	char cmd[CMD_MAX];
@@ -87,7 +110,7 @@ static int tc_egress_attach_bpf(const char* dev, const char* bpf_obj)
 	memset(&cmd, 0, CMD_MAX);
 	snprintf(cmd, CMD_MAX,
 		 "%s filter add dev %s "
-		 "egress prio 1 handle 1 bpf da obj %s sec ingress_redirect",
+		 "egress prio 1 handle 1 bpf da obj %s sec tf_tc_egress",
 		 tc_cmd, dev, bpf_obj); // TODO: adapt that line for our use cases
     //TODO : - find why prio 1 handle 1
     //       - change sec ingress_redirect to section name of my bpf file    
@@ -105,7 +128,7 @@ static int tc_egress_attach_bpf(const char* dev, const char* bpf_obj)
 
 // list_egress ???
 
-/* tc egress remove */
+/* Remove bpf program on tc egress path  */
 static int tc_remove_egress(const char* dev)
 {
 	char cmd[CMD_MAX];
@@ -130,10 +153,6 @@ static int tc_remove_egress(const char* dev)
 	return ret;
 }
 
-static char ingress_ifname[IF_NAMESIZE];
-static char egress_ifname[IF_NAMESIZE];
-static char buf_ifname[IF_NAMESIZE] = "(unknown-dev)";
-
 // Why ???
 bool validate_ifname(const char* input_ifname, char *output_ifname)
 {
@@ -154,38 +173,75 @@ bool validate_ifname(const char* input_ifname, char *output_ifname)
 	return true;
 }
 
+//TODO : handle error code
 int main(int argc, char **argv)
 {   
+       
+    int egress_ifindex = if_nametoindex(tc_egress_ifname); //why : test ifname
+	int ifindex_xdp = if_nametoindex(tc_egress_ifname);
+
+	//snprintf(egress_ifname, )
     
-    int egress_ifindex = -1;
-    egress_ifindex = if_nametoindex(egress_ifname); //why ??
-    
-    // validate egress_ifname
+    // test the validity of ifname
     if (!(egress_ifindex)){ //TODO : change this part later...
 				fprintf(stderr,
 					"ERR: --egress \"%s\" not real dev\n",
-					egress_ifname);
+					tc_egress_ifname);
 				return EXIT_FAILURE;
 	}
    
     /* inject tc-bpf-file in the kernel */
     printf("TC attach BPF object %s to device %s\n",
-			       TC_BPF_FILE, egress_ifname);
-    
-    if (tc_egress_attach_bpf(egress_ifname, TC_BPF_FILE)) {
+			       TC_BPF_FILE, tc_egress_ifname); 
+    if (tc_egress_attach_bpf(tc_egress_ifname, TC_BPF_FILE)) {
 			fprintf(stderr, "ERR: TC attach failed\n");
 			exit(EXIT_FAILURE);
 	}
 
+	/* inject and attach xdp-bpf-file */
+	printf("XDP load BPF file in kernel\n");
+	if(bpf_inject(LAUNCHER_BPF_FILE)){
+		printf("ERROR - Loading xdp file");
+		return 1;
+	}
+
+	printf("XDP attach BPF object to device %s\n",
+			xdp_ifname);
+	/* Attach xdp-bpf-file */
+	if (set_link_xdp_fd(ifindex_xdp, prog_fd[0], 0) < 0) {
+		printf("link set xdp fd failed\n");
+		return 1;
+	}
+
+	/* Inject data with raw sockets */
+
+	// Formation du paquet vtl
+	char *vtl_pkt = (char *)malloc(PCKT_LEN);
+	memset(vtl_pkt, 0, PCKT_LEN);
+	struct vtlhdr *vtl_hdr = (struct vtlhdr *)vtl_pkt;
+	
+	int vtlhdr_len = sizeof(struct vtlhdr);
+	char *vtl_payload = (char *)(vtl_pkt + vtlhdr_len);
+
+	
+
+	char buffer[PCKT_LEN];
+	struct iphdr *ip = (struct iphdr *)buffer;
+	struct vtldhr *vtl = (struct vtlhdr *)(buffer + sizeof(struct iphdr));
+	
+
     /* sleep for a specific time */
-    int nb_sec = 10;
+    int nb_sec = 50;
     printf("Sleep for %d sec\n", nb_sec);   
     sleep(nb_sec);
 
     /*  remove tc-bpf program */
-    printf("TC remove tc-bpf program on device %s\n", egress_ifname);
-    tc_remove_egress(egress_ifname);
+    printf("TC remove tc-bpf program on device %s\n", tc_egress_ifname);
+    tc_remove_egress(tc_egress_ifname);
 
+	/* remove xdp-bpf-file */
+	printf("XDP remove xdp-bpf program on device %s\n", tc_egress_ifname);
+	set_link_xdp_fd(ifindex_xdp, -1, 0);
 
     return 0;
 }

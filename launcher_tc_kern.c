@@ -8,6 +8,11 @@
 #include "./bpf/bpf_helpers.h"
 #include "./bpf/bpf_endian.h" // for now, not necessary.
 
+#include <linux/pkt_cls.h>
+//#include <uapi/linux/pkt_cls.h>
+//TODO add uapi
+
+
 /* Notice: TC and iproute2 bpf-loader uses another elf map layout */
 struct bpf_elf_map {
 	__u32 type;
@@ -38,3 +43,13 @@ struct bpf_elf_map {
  *
  */
 
+SEC("tf_tc_egress")
+int _tf_tc_egress(struct __sk_buff *skb)
+{
+    /* work only on the vtl packet */
+    //Idea : if(ip_proto == ipproto_vtl)
+
+    return TC_ACT_SHOT;
+}
+
+char _license[] SEC("license") = "GPL";

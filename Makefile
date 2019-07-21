@@ -7,6 +7,7 @@
 
 TARGETS := hooker1
 TARGETS += hooker2
+TARGETS += launcher
 
 
 
@@ -92,7 +93,7 @@ CLANG_FLAGS = -I. -I$(KDIR)/arch/$(ARCH)/include \
 
 EXTRA_CFLAGS=-Werror
 
-all: $(TEST) dependencies $(TARGETS) $(KERN_OBJECTS)
+all: $(TEST) dependencies $(TARGETS) $(KERN_OBJECTS) $(TC_KERN_OBJECTS)
 
 .PHONY: dependencies clean verify_cmds verify_llvm_target_bpf $(CLANG) $(LLC)
 
@@ -186,7 +187,9 @@ $(OBJECT_UDP): udp.c config.h
 # unaligned access checks where necessary
 #
 
-$(TC_KERN_OBJECTS): %
+$(TC_KERN_OBJECTS): %.o : %.c $(BPF_DIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
+	$(CLANG) $(CLANG_FLAGS) -c $< -o ${@:.o=.ll} 
+	$(LLC) -march=bpf -mcpu=$(CPU) -filetype=obj -o $@ ${@:.o=.ll}
 
 
 $(KERN_OBJECTS): %.o : %.c $(BPF_DIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
