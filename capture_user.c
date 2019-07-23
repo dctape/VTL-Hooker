@@ -9,10 +9,10 @@
 #include <linux/bpf.h>
 #include <sys/ioctl.h>
 
-#include "../../bpf/bpf_load.h"
-#include "../../bpf/libbpf.h"
-#include "../../bpf/perf-sys.h"
-#include "../../bpf/trace_helpers.h"
+#include "./bpf/bpf_load.h"
+#include "./bpf/libbpf.h"
+#include "./bpf/perf-sys.h"
+#include "./bpf/trace_helpers.h"
 
 
 #define CAPTURE_BPF_FILE    "capture_kern.o"

@@ -9,11 +9,11 @@
 #include <linux/ip.h>
 
 #include <linux/bpf.h>
-#include "../../bpf/bpf_helpers.h"
-#include "../../bpf/bpf_endian.h"
+#include "./bpf/bpf_helpers.h"
+#include "./bpf/bpf_endian.h"
 
-#include "../../config.h"
-#include "../../lib/maps.h"
+#include "config.h"
+#include "./lib/maps.h"
 
 #define IPPROTO_VTL 200
 struct vtlhdr{

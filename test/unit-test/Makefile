@@ -2,11 +2,12 @@
 UNIT_BPF_TESTS := injection
 
 
+
 BPF_DIR = ../../bpf
 TOOLS_PATH = $(BPF_DIR)/tools
 
 # Generate file name-scheme based on TARGETS
-#KERN_SOURCES = ${UNIT_BPF_TESTS:=_kern.c}
+#KERN_SOURCES = ${UNIT_BPF:=_kern.c}
 #USER_SOURCES = ${UNIT_BPF_TESTS:=_user.c}
 #KERN_OBJECTS = ${KERN_SOURCES:.c=.o}
 #USER_OBJECTS = ${USER_SOURCES:.c=.o}

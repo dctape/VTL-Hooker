@@ -3,6 +3,7 @@
 #define __BPF_LOAD_H
 
 #include "libbpf.h"
+#include <linux/perf_event.h>
 
 #define MAX_MAPS 32
 #define MAX_PROGS 32
@@ -64,6 +65,17 @@ struct ksym {
 
 int load_kallsyms(void);
 struct ksym *ksym_search(long key);
+
+/* Trace helpers */
+/* typedef enum bpf_perf_event_ret (*perf_event_print_fn)(void *data, int size);
+
+int perf_event_mmap(int fd);
+int perf_event_mmap_header(int fd, struct perf_event_mmap_page **header); */
+/* return LIBBPF_PERF_EVENT_DONE or LIBBPF_PERF_EVENT_ERROR */
+/* int perf_event_poller(int fd, perf_event_print_fn output_fn);
+int perf_event_poller_multi(int *fds, struct perf_event_mmap_page **headers,
+			    int num_fds, perf_event_print_fn output_fn); */
+
 
 /* UAPI XDP_FLAGS avail in include/linux/if_link.h, but distro are
  * lacking behind.

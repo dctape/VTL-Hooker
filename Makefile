@@ -8,6 +8,7 @@
 TARGETS := hooker1
 TARGETS += hooker2
 TARGETS += launcher
+TARGETS += capture
 
 
 
@@ -50,11 +51,13 @@ OBJECT_ADAPTER = adapter.o
 OBJECT_BPFMANAGER = bpf-manager.o
 OBJECT_UTIL = util.o
 OBJECT_UDP = udp.o
+OBJECT_TRACE_HELPERS = ./bpf/trace_helpers.o # search a better way.
 OBJECTS := $(OBJECT_LOADBPF) 
 OBJECTS += $(OBJECT_ADAPTER) 
 OBJECTS += $(OBJECT_BPFMANAGER) 
 OBJECTS += $(OBJECT_UTIL)
 OBJECTS += $(OBJECT_UDP)
+OBJECTS += $(OBJECT_TRACE_HELPERS)
 
 
 # The static libbpf library
@@ -175,6 +178,9 @@ $(OBJECT_UTIL): ./lib/util.c
 $(OBJECT_UDP): udp.c config.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
+$(OBJECT_TRACE_HELPERS): $(LIBBPF) ./bpf/trace_helpers.c ./bpf/trace_helpers.h
+	$(CC) $(CFLAGS) -o $@ -c $< $(LIBBPF)
+
 #LPTHREAD = -lpthread
 ##LIBBPF += $(TOOLS_PATH)/lib/libbpf/src/*.o
 
@@ -197,7 +203,7 @@ $(KERN_OBJECTS): %.o : %.c $(BPF_DIR)/bpf_helpers.h config.h ./lib/maps.h Makefi
 	$(LLC) -march=bpf -mcpu=$(CPU) -filetype=obj -o $@ ${@:.o=.ll}
 
 
-$(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile $(BPF_DIR)/bpf_util.h
+$(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile $(BPF_DIR)/bpf_util.h $(BPF_DIR)/trace_helpers.h 
 	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF) -lpthread
 
 
