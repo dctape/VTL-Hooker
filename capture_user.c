@@ -5,9 +5,11 @@
 #include <assert.h>
 #include <linux/ip.h>
 #include <net/if.h>
+#include <poll.h>
 #include <linux/perf_event.h>
 
 #include <linux/bpf.h>
+#include <sys/mman.h>
 #include <sys/ioctl.h>
 
 #include "./bpf/bpf_load.h"
@@ -17,29 +19,139 @@
 
 #include "bpf-manager.h"
 
-
+#define IPPROTO_VTL 200 
 #define CAPTURE_BPF_FILE    "capture_kern.o"
 
-#define IPPROTO_VTL 200 
-static int perf_fd;
 
+static int perf_fd;
 static char *xdp_ifname = "ens33";
 
-struct vtlhdr{
 
-	int value;
-	//TODO: add other members according use cases
+int page_size;
+int page_cnt = 8;
+volatile struct perf_event_mmap_page *header;
+
+typedef void (*print_fn)(void *data, int size);
+
+static int perf_event_mmap(int fd)
+{
+	void *base;
+	int mmap_size;
+
+	page_size = getpagesize();
+	mmap_size = page_size * (page_cnt + 1);
+
+	base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (base == MAP_FAILED) {
+		printf("mmap err\n");
+		return -1;
+	}
+
+	header = base;
+	return 0;
+}
+
+static int perf_event_poll(int fd)
+{
+	struct pollfd pfd = { .fd = fd, .events = POLLIN };
+
+	return poll(&pfd, 1, 1000);
+}
+
+struct perf_event_sample {
+	struct perf_event_header header;
+	__u32 size;
+	char data[];
 };
 
-static int print_vtl_packet(void *data, int size)
+static void perf_event_read(print_fn fn)
 {
-	//struct vtlhdr *vtlh = (struct  vtlhdr *)data;
-	//struct iphdr *iph = (struct iphdr *)data;
+	__u64 data_tail = header->data_tail;
+	__u64 data_head = header->data_head;
+	__u64 buffer_size = page_cnt * page_size;
+	void *base, *begin, *end;
+	char buf[256];
+
+	asm volatile("" ::: "memory"); /* in real code it should be smp_rmb() */
+	if (data_head == data_tail)
+		return;
+
+	base = ((char *)header) + page_size;
+
+	begin = base + data_tail % buffer_size;
+	end = base + data_head % buffer_size;
+
+	while (begin != end) {
+		struct perf_event_sample *e;
+
+		e = begin;
+		if (begin + e->header.size > base + buffer_size) {
+			long len = base + buffer_size - begin;
+
+			assert(len < e->header.size);
+			memcpy(buf, begin, len);
+			memcpy(buf + len, base, e->header.size - len);
+			e = (void *) buf;
+			begin = base + e->header.size - len;
+		} else if (begin + e->header.size == base + buffer_size) {
+			begin = base;
+		} else {
+			begin += e->header.size;
+		}
+
+		if (e->header.type == PERF_RECORD_SAMPLE) {
+			fn(e->data, e->size);
+		} else if (e->header.type == PERF_RECORD_LOST) {
+			struct {
+				struct perf_event_header header;
+				__u64 id;
+				__u64 lost;
+			} *lost = (void *) e;
+			printf("lost %lld events\n", lost->lost);
+		} else {
+			printf("unknown event type=%d size=%d\n",
+			       e->header.type, e->header.size);
+		}
+	}
+
+	__sync_synchronize(); /* smp_mb() */
+	header->data_tail = data_head;
+}
+
+static void hex_dump(unsigned char *buf, int len)
+{
+        while (len--)
+                printf("%02x", *buf++);
+	printf("\n");
+}
+
+//TODO : à modifier
+#define MAX_CNT 100000ll
+static void print_bpf_output(void *data, int size)
+{
+	static __u64 cnt;
+	struct {
+		__u64 pid;
+		__u64 cookie;
+	} *e = data;
+
+	printf("enter %s\n", __func__);
+	hex_dump(data, 16);
 	
-	int *proto = data;
-	printf("iph->protocol: %d", *proto);
-	
-	return LIBBPF_PERF_EVENT_CONT;
+/*
+	if (e->cookie != 0x12345678) {
+		printf("BUG pid %llx cookie %llx sized %d\n",
+		       e->pid, e->cookie, size);
+		kill(0, SIGINT);
+	}
+*/
+	cnt++;
+
+	if (cnt == MAX_CNT) {
+		printf("recv %lld events per sec\n",
+		       MAX_CNT * 1000000000ll / (time_get_ns() - start_time));
+		kill(0, SIGINT);
+	}
 }
 
 static void test_bpf_perf_event(void)
@@ -51,7 +163,8 @@ static void test_bpf_perf_event(void)
 	};
 	int key = 0;
 
-	perf_fd = sys_perf_event_open(&attr, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/, 0);
+	//perf_fd = sys_perf_event_open(&attr, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/, 0);
+	perf_fd = perf_event_open(&attr, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/, 0);
 
 	assert(perf_fd >= 0);
     /* if(perf_fd <= 0){
@@ -61,6 +174,32 @@ static void test_bpf_perf_event(void)
 	assert(bpf_map_update_elem(map_fd[0], &key, &perf_fd, BPF_ANY) == 0);
 	ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, 0);
 }
+
+
+
+struct vtlhdr{
+
+	int value;
+	//TODO: add other members according use cases
+};
+
+struct vtl_data {
+    __u16 eth_proto;
+
+};
+
+static int print_vtl_packet(void *data, int size)
+{
+	//struct vtlhdr *vtlh = (struct  vtlhdr *)data;
+	//struct iphdr *iph = (struct iphdr *)data;
+	
+	struct vtl_data *data_s = data;
+	printf("iph->protocol: %d", data_s->eth_proto);
+	
+	return LIBBPF_PERF_EVENT_CONT;
+}
+
+
 
 
 int main(int argc, char **argv)

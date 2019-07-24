@@ -29,8 +29,7 @@ struct bpf_map_def SEC("maps") my_map = {
 };
 
 struct vtl_data {
-    int value;
-    void *data;
+    __u16 eth_proto;
 
 };
 
@@ -42,11 +41,17 @@ int xdp_capture_vtl_program(struct xdp_md *ctx)
 
     struct ethhdr *eth = data;
 
-    if (data + sizeof(*eth) > data_end)
+    if (data + ETH_HLEN > data_end)
 		return XDP_DROP; // Est-ce la bonne action ?
 
-    if((void *)eth + 1 > data_end)
-        return XDP_DROP;
+    struct vtl_data data_s = {
+        .eth_proto = eth->h_proto,
+    };
+
+    bpf_perf_event_output(ctx, &my_map, 0, &data_s, sizeof(data_s));
+
+    //if((void *)eth + 1 > data_end)
+    //    return XDP_DROP;
 
 
 
@@ -77,7 +82,7 @@ int xdp_capture_vtl_program(struct xdp_md *ctx)
     //transmit data to userspace
     
 
-    return XDP_PASS;
+    return XDP_DROP;
 }
 
 char _license[] SEC("license") = "GPL";
