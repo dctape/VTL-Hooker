@@ -6,6 +6,7 @@
 #define KBUILD_MODNAME "foo"
 
 #include <linux/if_ether.h>
+//#include <linux/version.h>
 #include <linux/ip.h>
 
 #include <linux/bpf.h>
@@ -27,6 +28,12 @@ struct bpf_map_def SEC("maps") my_map = {
 	.max_entries = 2,
 };
 
+struct vtl_data {
+    int value;
+    void *data;
+
+};
+
 SEC("xdp")
 int xdp_capture_vtl_program(struct xdp_md *ctx)
 {
@@ -41,7 +48,9 @@ int xdp_capture_vtl_program(struct xdp_md *ctx)
     if((void *)eth + 1 > data_end)
         return XDP_DROP;
 
-    if(eth->h_proto != ETH_P_IP)
+
+
+    /* if(eth->h_proto != ETH_P_IP)
         return XDP_PASS;
     
     struct iphdr *iph = data + sizeof(*eth);
@@ -53,11 +62,16 @@ int xdp_capture_vtl_program(struct xdp_md *ctx)
     if(iph->protocol != IPPROTO_VTL)
         return XDP_PASS;
 
-    void *ip_pkt = data + ETH_HLEN; 
+    u8 proto = iph->protocol; */
+
+    //void *ip_pkt = data + ETH_HLEN; 
 
     //void *vtl_pkt = data + ETH_HLEN + iph_len;
 
-    bpf_perf_event_output(ctx, &my_map, 0, ip_pkt, sizeof(ip_pkt *));
+    /* int err;
+    err = xdp_event_output(ctx, &my_map, 0, &test, sizeof(test));
+    if (err < 0)
+        return XDP_PASS; */
 
     //struct vtlhdr *vtlh = (struct vtlhdr *)(data + ETH_HLEN + iph_len);
     //transmit data to userspace
@@ -67,3 +81,4 @@ int xdp_capture_vtl_program(struct xdp_md *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
+//u32 _version SEC("version") = LINUX_VERSION_CODE;

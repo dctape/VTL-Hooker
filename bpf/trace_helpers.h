@@ -14,6 +14,13 @@ int load_kallsyms(void);
 struct ksym *ksym_search(long key);
 long ksym_get_addr(const char *name); */
 
+
+enum bpf_perf_event_ret {
+	LIBBPF_PERF_EVENT_DONE	= 0,
+	LIBBPF_PERF_EVENT_ERROR	= -1,
+	LIBBPF_PERF_EVENT_CONT	= -2,
+};
+
 typedef enum bpf_perf_event_ret (*perf_event_print_fn)(void *data, int size);
 
 int perf_event_mmap(int fd);

@@ -6,6 +6,21 @@
  * different sections in elf_bpf file. Section names
  * are interpreted by elf_bpf loader
  */
+
+/** BPF helper functions for tc. Individual flags are in linux/bpf.h */
+
+#ifndef BPF_FUNC
+# define BPF_FUNC(NAME, ...)						\
+	(* NAME)(__VA_ARGS__) __maybe_unused = (void *) BPF_FUNC_##NAME
+#endif
+
+#ifndef BPF_FUNC2
+# define BPF_FUNC2(NAME, ...)						\
+	(* NAME)(__VA_ARGS__) __maybe_unused
+#endif
+
+
+
 #define SEC(NAME) __attribute__((section(NAME), used))
 
 /* helper functions called from eBPF programs written in C */
@@ -172,6 +187,12 @@ static int (*bpf_skb_vlan_pop)(void *ctx) =
 	(void *) BPF_FUNC_skb_vlan_pop;
 static int (*bpf_rc_pointer_rel)(void *ctx, int rel_x, int rel_y) =
 	(void *) BPF_FUNC_rc_pointer_rel;
+
+/* Events for user space */
+static int BPF_FUNC2(xdp_event_output, struct xdp_md *ctx, void *map, uint64_t index,
+		     const void *data, uint32_t size) = (void *)BPF_FUNC_perf_event_output;
+
+
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions

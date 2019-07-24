@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include <linux/ip.h>
+#include <net/if.h>
 #include <linux/perf_event.h>
 
 #include <linux/bpf.h>
@@ -13,6 +14,8 @@
 #include "./bpf/libbpf.h"
 #include "./bpf/perf-sys.h"
 #include "./bpf/trace_helpers.h"
+
+#include "bpf-manager.h"
 
 
 #define CAPTURE_BPF_FILE    "capture_kern.o"
@@ -31,8 +34,10 @@ struct vtlhdr{
 static int print_vtl_packet(void *data, int size)
 {
 	//struct vtlhdr *vtlh = (struct  vtlhdr *)data;
-	struct iphdr *iph = (struct iphdr *)data;
-	printf("iph->protocol: %d", iph->protocol);
+	//struct iphdr *iph = (struct iphdr *)data;
+	
+	int *proto = data;
+	printf("iph->protocol: %d", *proto);
 	
 	return LIBBPF_PERF_EVENT_CONT;
 }

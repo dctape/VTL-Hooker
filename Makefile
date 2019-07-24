@@ -10,27 +10,24 @@ TARGETS += hooker2
 TARGETS += launcher
 TARGETS += capture
 
-
-
-
-BPF_DIR = bpf
-TOOLS_PATH = ./bpf/tools
-
-
 # Generate file name-scheme based on TARGETS
+#TODO: add tc_bpf_kern to KERN_OBJECTS
+TC_KERN_OBJECTS := launcher_tc_kern.o
+
 KERN_SOURCES = ${TARGETS:=_kern.c}
 USER_SOURCES = ${TARGETS:=_user.c}
 KERN_OBJECTS = ${KERN_SOURCES:.c=.o}
 USER_OBJECTS = ${USER_SOURCES:.c=.o}
 
-TC_KERN_OBJECTS := launcher_tc_kern.o
-
-#add tc_bpf_kern to KERN_OBJECTS
-
+BPFDIR = bpf
+LIBDIR = lib
 KDIR ?= /lib/modules/$(shell uname -r)/source
+
+TOOLS_PATH = $(BPFDIR)/tools
 ARCH := $(subst x86_64,x86,$(shell arch))
 
 
+CC = gcc
 CFLAGS := -no-pie -g -O2 -Wall
 
 # Local copy of include/linux/bpf.h kept under ./kernel-usr-include
@@ -40,18 +37,18 @@ CFLAGS += -I./bpf/kernel-usr-include/
 #
 # Interacting with libbpf
 CFLAGS += -I$(TOOLS_PATH)/lib
-
-
-LDFLAGS= -lelf
+LDFLAGS= -lelf -lpthread
 
 # Objects that xxx_user program is linked with:
 #TODO : optimize this later...
-OBJECT_LOADBPF = ./bpf/bpf_load.o
+OBJECT_LOADBPF = $(BPFDIR)/bpf_load.o
 OBJECT_ADAPTER = adapter.o
 OBJECT_BPFMANAGER = bpf-manager.o
-OBJECT_UTIL = util.o
+OBJECT_UTIL = $(LIBDIR)/util.o
 OBJECT_UDP = udp.o
 OBJECT_TRACE_HELPERS = ./bpf/trace_helpers.o # search a better way.
+
+# est-ce nécessaire de monter tous les objets ?
 OBJECTS := $(OBJECT_LOADBPF) 
 OBJECTS += $(OBJECT_ADAPTER) 
 OBJECTS += $(OBJECT_BPFMANAGER) 
@@ -66,8 +63,6 @@ LIBBPF = $(TOOLS_PATH)/lib/bpf/libbpf.a
 
 LLC ?= llc
 CLANG ?= clang
-
-CC = gcc
 
 NOSTDINC_FLAGS := -nostdinc -isystem $(shell $(CC) -print-file-name=include)
 
@@ -85,7 +80,7 @@ CLANG_FLAGS = -I. -I$(KDIR)/arch/$(ARCH)/include \
 	-Wno-gnu-variable-sized-type-not-at-end \
 	-Wno-address-of-packed-member -Wno-tautological-compare \
 	-Wno-unknown-warning-option \
-	-include $(BPF_DIR)/asm_goto_workaround.h \
+	-include $(BPFDIR)/asm_goto_workaround.h \
 	-O2 -emit-llvm
 
 # TODO: can we remove(?) copy of uapi/linux/bpf.h stored here: ./tools/include/
@@ -154,16 +149,10 @@ verify_llvm_target_bpf: verify_cmds
 		exit 2; \
 	else true; fi
 
+
 # Most xxx_user program still depend on old bpf_load.c
-$(OBJECT_LOADBPF): ./bpf/bpf_load.c ./bpf/bpf_load.h
+$(OBJECT_LOADBPF): $(BPFDIR)/bpf_load.c $(BPFDIR)/bpf_load.h
 	$(CC) $(CFLAGS) -o $@ -c $<
-
-LIBBPF_SOURCES  = $(TOOLS_PATH)/lib/bpf/*.c
-
-
-# New ELF-loaded avail in libbpf (in bpf/libbpf.c)
-$(LIBBPF): $(LIBBPF_SOURCES) $(TOOLS_PATH)/lib/bpf/Makefile
-	make -C $(TOOLS_PATH)/lib/bpf/ all
 
 #TODO: optimize this later
 $(OBJECT_ADAPTER): adapter.c config.h
@@ -172,14 +161,21 @@ $(OBJECT_ADAPTER): adapter.c config.h
 $(OBJECT_BPFMANAGER): bpf-manager.c config.h
 	$(CC) $(CFLAGS) -o $@ -c $< $(LIBBPF)
 
-$(OBJECT_UTIL): ./lib/util.c
+$(OBJECT_UTIL): $(LIBDIR)/util.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(OBJECT_UDP): udp.c config.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-$(OBJECT_TRACE_HELPERS): $(LIBBPF) ./bpf/trace_helpers.c ./bpf/trace_helpers.h
+$(OBJECT_TRACE_HELPERS): $(LIBBPF) $(BPFDIR)/trace_helpers.c $(BPFDIR)/trace_helpers.h
 	$(CC) $(CFLAGS) -o $@ -c $< $(LIBBPF)
+
+
+LIBBPF_SOURCES  = $(TOOLS_PATH)/lib/bpf/*.c
+
+# New ELF-loaded avail in libbpf (in bpf/libbpf.c)
+$(LIBBPF): $(LIBBPF_SOURCES) $(TOOLS_PATH)/lib/bpf/Makefile
+	make -C $(TOOLS_PATH)/lib/bpf/ all
 
 #LPTHREAD = -lpthread
 ##LIBBPF += $(TOOLS_PATH)/lib/libbpf/src/*.o
@@ -193,18 +189,18 @@ $(OBJECT_TRACE_HELPERS): $(LIBBPF) ./bpf/trace_helpers.c ./bpf/trace_helpers.h
 # unaligned access checks where necessary
 #
 
-$(TC_KERN_OBJECTS): %.o : %.c $(BPF_DIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
+$(TC_KERN_OBJECTS): %.o : %.c $(BPFDIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
 	$(CLANG) $(CLANG_FLAGS) -c $< -o ${@:.o=.ll} 
 	$(LLC) -march=bpf -mcpu=$(CPU) -filetype=obj -o $@ ${@:.o=.ll}
 
 
-$(KERN_OBJECTS): %.o : %.c $(BPF_DIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
+$(KERN_OBJECTS): %.o : %.c $(BPFDIR)/bpf_helpers.h config.h ./lib/maps.h Makefile
 	$(CLANG) $(CLANG_FLAGS) -c $< -o ${@:.o=.ll} 
 	$(LLC) -march=bpf -mcpu=$(CPU) -filetype=obj -o $@ ${@:.o=.ll}
 
 
-$(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile $(BPF_DIR)/bpf_util.h $(BPF_DIR)/trace_helpers.h 
-	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF) -lpthread
+$(TARGETS): %: %_user.c $(OBJECTS) $(LIBBPF) Makefile $(BPFDIR)/bpf_util.h $(BPFDIR)/trace_helpers.h 
+	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@ $<  $(LIBBPF) 
 
 
 
