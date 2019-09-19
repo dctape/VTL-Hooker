@@ -6,9 +6,12 @@
 #include "util.h"
 
 #include <stdio.h>
+#include <ctype.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include <sys/types.h>
+#include <net/if.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <mntent.h>
@@ -45,4 +48,24 @@ int get_cgroup_root_fd(void)
         return -1; // Revoir...
 	}
     return cgfd;
+}
+
+// Why ???
+bool validate_ifname(const char* input_ifname, char *output_ifname)
+{
+	size_t len;
+	int i;
+
+	len = strlen(input_ifname);
+	if (len >= IF_NAMESIZE) {
+		return false;
+	}
+	for (i = 0; i < len; i++) {
+		char c = input_ifname[i];
+
+		if (!(isalpha(c) || isdigit(c)))
+			return false;
+	}
+	strncpy(output_ifname, input_ifname, len);
+	return true;
 }

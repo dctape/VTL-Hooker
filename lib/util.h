@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include <errno.h>
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
@@ -18,7 +19,7 @@
 
 char *find_cgroup_root(void);
 int get_cgroup_root_fd(void);
-
+bool validate_ifname(const char* input_ifname, char *output_ifname);
 
 
 #endif
