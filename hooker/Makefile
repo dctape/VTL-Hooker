@@ -19,7 +19,7 @@ USER_OBJECTS = ${USER_SOURCES:.c=.o}
 
 BPFDIR = ../bpf
 LIBDIR = ../lib
-KDIR ?= /lib/modules/$(shell uname -r)/source
+KDIR ?= /lib/modules/$(shell uname -r)/build/
 
 TOOLS_PATH = $(BPFDIR)/tools
 ARCH := $(subst x86_64,x86,$(shell arch))

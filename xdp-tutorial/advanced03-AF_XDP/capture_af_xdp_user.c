@@ -35,6 +35,7 @@ struct xsk_umem_info {
 	void *buffer;
 };
 
+//Pas trop nécessaire
 struct stats_record {
 	uint64_t timestamp;
 	uint64_t rx_packets;
