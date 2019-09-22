@@ -3,8 +3,12 @@
 #include <errno.h>
 #include <string.h>
 
-#include <bpf/bpf.h>
-#include <bpf/libbpf.h>
+//#include <bpf/bpf.h>
+//#include <bpf/libbpf.h>
+
+//#include "../libbpf/include/uapi/linux/bpf.h"
+#include "../libbpf/src/bpf.h"
+#include "../libbpf/src/libbpf.h"
 
 #include "common_libbpf.h"
 

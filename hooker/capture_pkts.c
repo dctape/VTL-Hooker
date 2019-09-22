@@ -13,3 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <sys/resource.h>
+
+#include <linux/bpf.h> //TODO: Est-ce nécessaire ??
+#include "../bpf/bpf-manager.h" //Pour utiliser le wrapper de libbpf
+

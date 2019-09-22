@@ -16,21 +16,25 @@
 #include <sys/resource.h>
 
 //TODO: remplacer par des chemins relatifs
-#include <bpf/bpf.h>
-#include <bpf/xsk.h>
+//#include <bpf/bpf.h>
+#include "../../libbpf/src/bpf.h"
+//#include <bpf/xsk.h>
+#include "../../libbpf/src/xsk.h"
 
 #include <arpa/inet.h>
 #include <net/if.h> //TODO: revoir l'utilité de ces include
-#include <linux/if_link.h>
+//TODO : Fix it
+//#include <linux/if_link.h>
+#include "../../libbpf/include/uapi/linux/if_link.h"
 #include <linux/if_ether.h>
 
 //TODO : Considérer que ce qui est important
-#include "../common/common_params.h"
-#include "../common/common_user_bpf_xdp.h"
-#include "../common/common_libbpf.h"
+#include "../../common/common_params.h"
+#include "../../common/common_user_bpf_xdp.h"
+#include "../../common/common_libbpf.h"
 
 
-#define XDP_FILENAME       "capture_xdp.o"
+#define XDP_FILENAME       "capture_kern.o"
 
 //TODO : comprendre la signification de ces define
 #define NUM_FRAMES         4096
@@ -338,8 +342,8 @@ int main(int argc, char **argv)
 	uint64_t packet_buffer_size;
 	struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
     struct config cfg = {
-        .ifindex = if_nametoindex(ifname);
-        .ifname = ifname;
+        .ifindex = if_nametoindex(ifname),
+        .ifname = ifname,
         .do_unload = false,
 		.filename = XDP_FILENAME,
 		.progsec = "xdp_sock"

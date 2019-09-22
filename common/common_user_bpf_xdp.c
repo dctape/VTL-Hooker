@@ -1,14 +1,21 @@
-#include <bpf/libbpf.h> /* bpf_get_link_xdp_id + bpf_set_link_xdp_id */
+//#include <bpf/libbpf.h> /* bpf_get_link_xdp_id + bpf_set_link_xdp_id */
+#include "../libbpf/src/libbpf.h"
 #include <string.h>     /* strerror */
 #include <net/if.h>     /* IF_NAMESIZE */
 #include <stdlib.h>     /* exit(3) */
 #include <errno.h>
 
-#include <bpf/bpf.h>
-#include <bpf/libbpf.h>
+//#include <bpf/bpf.h>
+#include "../libbpf/src/bpf.h"
+#include "../libbpf/src/libbpf.h"
+//#include <bpf/libbpf.h>
 
-#include <linux/if_link.h> /* Need XDP flags */
-#include <linux/err.h>
+//TODO :
+//#include <linux/if_link.h> /* Need XDP flags */
+//#include <linux/err.h>
+
+#include "../libbpf/include/uapi/linux/if_link.h"
+#include "../libbpf/include/linux/err.h"
 
 #include "common_defines.h"
 

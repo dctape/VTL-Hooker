@@ -24,7 +24,7 @@ COMMON_DIR ?= ../common/
 LIBBPF_DIR ?= ../libbpf/src/
 
 COPY_LOADER ?=
-LOADER_DIR ?= $(COMMON_DIR)/../basic-solutions
+#LOADER_DIR ?= $(COMMON_DIR)/../basic-solutions
 
 OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
 
@@ -45,7 +45,8 @@ CFLAGS += -I/usr/include/x86_64-linux-gnu
 CFLAGS += -I../headers/
 LDFLAGS ?= -L$(LIBBPF_DIR)
 
-LIBS = -l:libbpf.a -lelf $(USER_LIBS)
+#LIBS = -l:libbpf.a -lelf $(USER_LIBS)
+LIBS = $(LIBBPF_DIR)/libbpf.a -lelf $(USER_LIBS)
 
 all: llvm-check $(USER_TARGETS) $(XDP_OBJ) $(COPY_LOADER) $(COPY_STATS)
 
