@@ -13,9 +13,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-//TODO : Fix it
-//#include <linux/if_xdp.h>
-#include "../include/uapi/linux/if_xdp.h"
+#include <linux/if_xdp.h>
 
 #include "libbpf.h"
 #include "libbpf_util.h"

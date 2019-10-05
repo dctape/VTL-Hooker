@@ -5,10 +5,13 @@
 #include <linux/types.h>
 #include <stdbool.h>
 
+#include <bpf/bpf.h> // pour enum bpf_prog_type
+
 struct config {
 	__u32 xdp_flags;
 	int ifindex;
 	char *ifname;
+	enum bpf_prog_type prog_type;
 	char ifname_buf[IF_NAMESIZE];
 	int redirect_ifindex;
 	char *redirect_ifname;

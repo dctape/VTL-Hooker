@@ -4,11 +4,11 @@
  * 
  */
 
-#ifndef __HK_MAPS_
-#define __HK_MAPS_
+#ifndef __MAPS_H
+#define __MAPS_H
 
-#include "../bpf/bpf_helpers.h"
-
+// Peut-être pas nécessaire
+//#include "bpf_helpers.h" // pour bpf_map_def
 
 /* map stockant la clé socket du client ou du serveur */ 
 struct bpf_map_def SEC("maps") sock_key_map = {
@@ -26,4 +26,4 @@ struct bpf_map_def SEC("maps") hooker_map = {
 	.max_entries = 20
 };
 
-#endif
+#endif /* __MAPS_H */

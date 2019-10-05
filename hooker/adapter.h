@@ -1,6 +1,6 @@
 
-#ifndef __HK_ADAPTER_H
-#define __HK_ADAPTER_H
+#ifndef __ADAPTER_H
+#define __ADAPTER_H
 
 #include <stdlib.h>
 #include "../lib/config.h" // est-ce utile ici ?
@@ -22,4 +22,4 @@ int adapter_sendto_redirector(char *snd_data);
 
 
 
-#endif
+#endif /* __ADAPTER_H */

@@ -3,9 +3,6 @@
  * 
 */
 
-#include "udp.h"
-
-
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -14,8 +11,11 @@
 #include <netinet/in.h>
 #include <errno.h>
 
+#include "udp.h"
+
 #define udpsock1_port       10005
 #define udpsock2_port       10006
+
 
 int udpsock1; // client udp
 int udpsock2; // serveur udp

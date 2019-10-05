@@ -33,11 +33,13 @@
 #include <sys/stat.h>
 
 #include <linux/bpf.h>
+
 #include "../bpf/bpf-manager.h"
 #include "../lib/util.h"
 #include "adapter.h"
 #include "udp.h"
 
+// TODO: le configurer dans le makefile
 #define REDIRECTOR_OBJECT        "redirector1.o" // hooker1
 
 // temporary
@@ -53,55 +55,56 @@ int host = CLIENT;
 // hackish way : for now, not very portable, depend on host: client or server
 //TODO : use switch for handle the different used protocols
 // TODO: handle error code
-void *adapter_snd(void *arg){ 
+void *adapter_snd(void *arg)
+{ 
     
-    int numBytes;
-    char *io_buffer;
-    char hooker_buffer[MAX_DATA_SIZE];
+	int numBytes;
+	char *io_buffer;
+	char hooker_buffer[MAX_DATA_SIZE];
 
-    io_buffer = (char *)malloc(IO_BUFSIZE);
-    while (1)
-    {
-         /* data (+ metadata) received by adapter from redirector */
-        numBytes = adapter_recvfrom_redirector(hooker_buffer);
-        if(numBytes < 0){ // TODO: change this later...
-                free(io_buffer); 
-                return NULL;
-        }
+	io_buffer = (char *)malloc(IO_BUFSIZE);
+	while (1)
+	{
+		/* data (+ metadata) received by adapter from redirector */
+		numBytes = adapter_recvfrom_redirector(hooker_buffer);
+		if(numBytes < 0){ // TODO: change this later...
+			free(io_buffer); 
+			return NULL;
+		}
 
-        fprintf(stderr,"Redirector : %s", hooker_buffer); // for tests
+		fprintf(stderr,"Redirector : %s", hooker_buffer); // for tests
 
-        /* copy data from hooker_buffer to io_buffer : is it optimal ? */
-        if(memcpy(io_buffer, hooker_buffer, strlen(hooker_buffer)) == NULL){
-            fprintf(stderr, "Error memcpy\n");
-            return NULL;
-        }
+		/* copy data from hooker_buffer to io_buffer : is it optimal ? */
+		if(memcpy(io_buffer, hooker_buffer, strlen(hooker_buffer)) == NULL){
+		fprintf(stderr, "Error memcpy\n");
+		return NULL;
+		}
 
-        fprintf(stderr,"io_buffer : %s", io_buffer);
+		fprintf(stderr,"io_buffer : %s", io_buffer);
 
-        /* send data to host */
-        if(host == CLIENT){
+		/* send data to host */
+		if(host == CLIENT){
 
-            numBytes = udp_snd(udpsock1, io_buffer, udpsock1_to);
-            if (numBytes < 0){
-                perror("Send data to server failed\n");
-                free(io_buffer); 
-                return NULL;
-            }
-        }
-        else if (host == SERVER)
-        {
-            numBytes = udp_snd(udpsock2, io_buffer, udpsock2_to);
-            if (numBytes < 0){
-                perror("Send data to client failed\n");
-                free(io_buffer); 
-                return NULL;
-            }
-        }
-        fprintf(stderr,"numBytes : %d", numBytes);
-    }
+		numBytes = udp_snd(udpsock1, io_buffer, udpsock1_to);
+		if (numBytes < 0){
+			perror("Send data to server failed\n");
+			free(io_buffer); 
+			return NULL;
+		}
+		}
+		else if (host == SERVER)
+		{
+		numBytes = udp_snd(udpsock2, io_buffer, udpsock2_to);
+		if (numBytes < 0){
+			perror("Send data to client failed\n");
+			free(io_buffer); 
+			return NULL;
+		}
+		}
+		fprintf(stderr,"numBytes : %d", numBytes);
+	}
 
-    free(io_buffer); // is it compulsory ?   
+	free(io_buffer); // is it compulsory ?   
 }
 
 

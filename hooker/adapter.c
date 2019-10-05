@@ -5,9 +5,6 @@
  * 
 */
 
-#include "adapter.h"
-
-
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -15,6 +12,9 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <errno.h>
+
+#include "adapter.h"
+
 
 //globals
 int sock_server;
@@ -146,9 +146,6 @@ int send_datato_redirector(char *snd_buf)
 {
     return send(sock_redir, snd_buf, strlen(snd_buf), 0);
 }
-
-
-
 
 
 /* fonction qui récupère les données de l'application legacy et les envoie vers le destinataire */

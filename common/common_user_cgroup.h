@@ -1,0 +1,25 @@
+/*
+ *
+ * utilities
+ * 
+ */
+
+#ifndef __COMMON_USER_CGROUP_H
+#define __COMMON_USER_CGROUP_H
+
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include <errno.h>
+
+#define clean_errno() (errno == 0 ? "None" : strerror(errno))
+#define log_err(MSG, ...) fprintf(stderr, "(%s:%d: errno: %s) " MSG "\n", \
+	__FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
+
+
+char *find_cgroup_root(void);
+int get_cgroup_root_fd(void);
+//bool validate_ifname(const char* input_ifname, char *output_ifname);
+
+
+#endif /* __COMMON_USER_CGROUP_H */

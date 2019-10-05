@@ -7,11 +7,8 @@
 #include <errno.h>
 
 #include <net/if.h>
-//#include <linux/if_link.h> /* XDP_FLAGS_* depend on kernel-headers installed */
-//#include <linux/if_xdp.h>
-
-#include "../libbpf/include/uapi/linux/if_link.h"
-#include "../libbpf/include/uapi/linux/if_xdp.h"
+#include <linux/if_link.h> /* XDP_FLAGS_* depend on kernel-headers installed */
+#include <linux/if_xdp.h>
 
 #include "common_params.h"
 

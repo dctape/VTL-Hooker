@@ -10,69 +10,75 @@
 #  XDP_TARGETS and USER_TARGETS
 # as a space-separated list
 #
+
+# USER_TARGETS : prog in userspace
+# KERN_TARGETS : prog in kernel space
+
 LLC ?= llc
 CLANG ?= clang
 CC ?= gcc
 
-XDP_C = ${XDP_TARGETS:=.c}
-XDP_OBJ = ${XDP_C:.c=.o}
-USER_C := ${USER_TARGETS:=.c}
-USER_OBJ := ${USER_C:.c=.o}
+KERN_SRC = ${KERN_TARGETS:=.c}
+KERN_OBJ = ${KERN_SRC:.c=.o}
+USER_SRC := ${USER_TARGETS:=.c}
+USER_OBJ := ${USER_SRC:.c=.o}
 
 # Expect this is defined by including Makefile, but define if not
 COMMON_DIR ?= ../common/
 LIBBPF_DIR ?= ../libbpf/src/
 
-COPY_LOADER ?=
-#LOADER_DIR ?= $(COMMON_DIR)/../basic-solutions
 
 OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
 
 # Extend if including Makefile already added some
-COMMON_OBJS += $(COMMON_DIR)/common_params.o $(COMMON_DIR)/common_user_bpf_xdp.o
+COMMON_OBJS += $(COMMON_DIR)/common_params.o \
+	       $(COMMON_DIR)/common_libbpf.o \
+ 	       $(COMMON_DIR)/common_user_bpf_xdp.o \
+	       $(COMMON_DIR)/common_user_bpf_xsk.o \
+	       $(COMMON_DIR)/common_user_cgroup.o
+	       
 
-# Create expansions for dependencies
+
+## Create expansions for dependencies
 COMMON_H := ${COMMON_OBJS:.o=.h}
 
 EXTRA_DEPS +=
 
 # BPF-prog kern and userspace shares struct via header file:
+## Intéressant comme approche...
 KERN_USER_H ?= $(wildcard common_kern_user.h)
 
+## En-tête pour les fichiers sources
 CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -g
 # Extra include for Ubuntu issue #44
 CFLAGS += -I/usr/include/x86_64-linux-gnu
+## Autre en-têtes 
 CFLAGS += -I../headers/
+## Mettre à disposition les fichiers sources de libbpf
+## pour l'édition de liens
 LDFLAGS ?= -L$(LIBBPF_DIR)
 
-#LIBS = -l:libbpf.a -lelf $(USER_LIBS)
-LIBS = $(LIBBPF_DIR)/libbpf.a -lelf $(USER_LIBS)
 
-all: llvm-check $(USER_TARGETS) $(XDP_OBJ) $(COPY_LOADER) $(COPY_STATS)
+## USER_LIBS semble être très intéressant
+LIBS = -l:libbpf.a -lelf $(USER_LIBS)
+
+## llvm-check : quelques vérification au niveau du compilateur llvm
+## $(USER_TARGETS) : compilation normale pour le fichier d'en-tête
+## $(KERN_OBJ) : compilation des fichiers kern objets => indispensable
+all: llvm-check $(USER_TARGETS) $(KERN_OBJ)
 
 .PHONY: clean $(CLANG) $(LLC)
 
+## TODO: peut-être ajouter : mrproper ??
 clean:
 	rm -rf $(LIBBPF_DIR)/build
 	$(MAKE) -C $(LIBBPF_DIR) clean
 	$(MAKE) -C $(COMMON_DIR) clean
-	rm -f $(USER_TARGETS) $(XDP_OBJ) $(USER_OBJ) $(COPY_LOADER) $(COPY_STATS)
+#	rm -f $(USER_TARGETS) $(XDP_OBJ) $(USER_OBJ) $(COPY_LOADER) $(COPY_STATS)
+	rm -f $(USER_TARGETS) $(KERN_OBJ) $(USER_OBJ)
 	rm -f *.ll
 	rm -f *~
 
-ifdef COPY_LOADER
-$(COPY_LOADER): $(LOADER_DIR)/${COPY_LOADER:=.c} $(COMMON_H)
-	make -C $(LOADER_DIR) $(COPY_LOADER)
-	cp $(LOADER_DIR)/$(COPY_LOADER) $(COPY_LOADER)
-endif
-
-ifdef COPY_STATS
-$(COPY_STATS): $(LOADER_DIR)/${COPY_STATS:=.c} $(COMMON_H)
-	make -C $(LOADER_DIR) $(COPY_STATS)
-	cp $(LOADER_DIR)/$(COPY_STATS) $(COPY_STATS)
-# Needing xdp_stats imply depending on header files:
-EXTRA_DEPS += $(COMMON_DIR)/xdp_stats_kern.h $(COMMON_DIR)/xdp_stats_kern_user.h
-endif
 
 # For build dependency on this file, if it gets updated
 COMMON_MK = $(COMMON_DIR)/common.mk
@@ -85,6 +91,7 @@ llvm-check: $(CLANG) $(LLC)
 		else true; fi; \
 	done
 
+# Compilation de la bibliothèque statique libbpf
 $(OBJECT_LIBBPF):
 	@if [ ! -d $(LIBBPF_DIR) ]; then \
 		echo "Error: Need libbpf submodule"; \
@@ -108,7 +115,7 @@ $(USER_TARGETS): %: %.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $
 	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o $@ $(COMMON_OBJS) \
 	 $< $(LIBS)
 
-$(XDP_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS)
+$(KERN_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS)
 	$(CLANG) -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \
