@@ -20,7 +20,7 @@
 				##__VA_ARGS__);			\
 })
 
-
+//ajout
 void hk_add_hmap(struct bpf_sock_ops *skops)
 {
     /* Extract key */
@@ -45,9 +45,10 @@ int redirector_sockops(struct bpf_sock_ops *skops)
 {
     /* add passive or active established socket  to hooker sockhash  */
   
-    int key = 0;
-    int *value;
-    __u32 family, op = skops->op;
+    //int key = 0;
+    //int *value;
+    //__u32 family; 
+    __u32 op = skops->op;
 
     switch(op){
 
