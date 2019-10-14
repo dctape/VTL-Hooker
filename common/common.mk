@@ -31,17 +31,20 @@ LIBBPF_DIR ?= ../libbpf/src/
 OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
 
 # Extend if including Makefile already added some
-COMMON_OBJS += $(COMMON_DIR)/common_params.o \
-	       $(COMMON_DIR)/common_libbpf.o \
- 	       $(COMMON_DIR)/common_user_bpf_xdp.o \
-	       $(COMMON_DIR)/common_user_bpf_xsk.o \
-	       $(COMMON_DIR)/common_user_cgroup.o
+COMMON_OBJS +=  $(COMMON_DIR)/common_params.o \
+		$(COMMON_DIR)/common_libbpf.o \
+		$(COMMON_DIR)/common_user_bpf_xdp.o \
+		$(COMMON_DIR)/common_user_bpf_xsk.o \
+		$(COMMON_DIR)/common_user_cgroup.o \
+		$(COMMON_DIR)/common_user_bpf_socket.o \
+		$(COMMON_DIR)/common_user_bpf_tc.o
 	       
 
 
 ## Create expansions for dependencies
 COMMON_H := ${COMMON_OBJS:.o=.h}
 
+## TODO: Utilisable ?
 EXTRA_DEPS +=
 
 # BPF-prog kern and userspace shares struct via header file:
@@ -107,15 +110,16 @@ $(OBJECT_LIBBPF):
 $(COMMON_H): %.h: %.c
 	touch $@
 
+# TODO: Penser à utiliser cette méthode pour la compilation des protocoles de transport
 # Detect if any of common obj changed and create dependency on .h-files
 $(COMMON_OBJS): %.o: %.h
 	make -C $(COMMON_DIR)
 
-$(USER_TARGETS): %: %.c  $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
-	$(CC) -Wall $(CFLAGS) $(LDFLAGS) -o $@ $(COMMON_OBJS) \
+$(USER_TARGETS): %: %.c $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
+	$(CC) -Wall $(CFLAGS) $(USER_DEPS) $(LDFLAGS) -o $@ $(COMMON_OBJS) \
 	 $< $(LIBS)
 
-$(KERN_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS)
+$(KERN_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(KERN_DEPS)
 	$(CLANG) -S \
 	    -target bpf \
 	    -D __BPF_TRACING__ \

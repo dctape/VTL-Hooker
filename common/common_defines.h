@@ -5,27 +5,41 @@
 #include <linux/types.h>
 #include <stdbool.h>
 
-#include <bpf/bpf.h> // pour enum bpf_prog_type
-
+//#include <bpf/bpf.h> // pour enum bpf_prog_type
+// Pas nécessaire
 struct config {
+	
+	int prog_type[3]; /* Nombre maximal de programme eBPF par fichier */
+	int prog_attach_type[3];
+	char filename[512];
+	char progsec[32];
+	char pin_dir[512];
+	bool do_unload;
+	bool reuse_maps;
+	unsigned int attach_flags;
+
+	/* skmsg */
+	int sock_map_fd;
+
+	/* sockops */
+	int cgroup_fd;
+
+	/* XDP */
 	__u32 xdp_flags;
 	int ifindex;
 	char *ifname;
-	enum bpf_prog_type prog_type;
 	char ifname_buf[IF_NAMESIZE];
-	int redirect_ifindex;
-	char *redirect_ifname;
-	char redirect_ifname_buf[IF_NAMESIZE];
-	bool do_unload;
-	bool reuse_maps;
-	char pin_dir[512];
-	char filename[512];
-	char progsec[32];
-	char src_mac[18];
-	char dest_mac[18];
+
+	/* af_xdp */
 	__u16 xsk_bind_flags;
 	int xsk_if_queue;
 	bool xsk_poll_mode;
+//	int redirect_ifindex;
+//	char *redirect_ifname;
+//	char redirect_ifname_buf[IF_NAMESIZE];	
+	// char src_mac[18];
+	// char dest_mac[18];
+	
 };
 
 /* Defined in common_params.o */

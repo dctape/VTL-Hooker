@@ -2,11 +2,12 @@
 CC := gcc
 
 # TODO : améliorer cette partie
-all: common_params.o \ 
-     common_libbpf.o \
+all: common_params.o common_libbpf.o \
      common_user_bpf_xdp.o \
      common_user_bpf_xsk.o \
-     common_user_cgroup.o
+     common_user_cgroup.o \
+     common_user_bpf_socket.o \
+     common_user_bpf_tc.o
 
 CFLAGS := -g -Wall
 
@@ -16,7 +17,6 @@ CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
 
 common_params.o: common_params.c common_params.h
 	$(CC) $(CFLAGS) -c -o $@ $<
-
 common_libbpf.o: common_libbpf.c common_libbpf.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
@@ -30,6 +30,12 @@ common_user_bpf_xsk.o: common_user_bpf_xsk.c common_user_bpf_xsk.h
 
 common_user_cgroup.o: common_user_cgroup.c common_user_cgroup.h 	
 	$(CC) $(CFLAGS) -c -o $@ $< 
+
+common_user_bpf_socket.o: common_user_bpf_socket.c common_libbpf.h common_user_bpf_socket.h	
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+common_user_bpf_tc.o: common_user_bpf_tc.c common_user_bpf_tc.h
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 .PHONY: clean
 
