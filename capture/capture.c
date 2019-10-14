@@ -29,6 +29,7 @@
 #include <net/if.h>
 #include <linux/if_link.h>
 #include <linux/if_ether.h>
+#include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
 
@@ -40,160 +41,24 @@
 
 
 
-#define XDP_FILENAME       "capture_kern.o"
-#define NIC_NAME		   "ens33"
-#define IPPROTO_VTL 200
+#define XDP_FILENAME       		"capture_kern.o"
+#define NIC_NAME		   	"ens33"
+#define IPPROTO_VTL 			200
 
 //TODO : comprendre la signification de ces define
-#define NUM_FRAMES         4096
-#define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
-#define RX_BATCH_SIZE      64
-#define INVALID_UMEM_FRAME UINT64_MAX
+#define RX_BATCH_SIZE      		64
+
 
 struct vtlhdr{
 	int value;
 };
 
-struct xsk_umem_info {
-	struct xsk_ring_prod fq;
-	struct xsk_ring_cons cq;
-	struct xsk_umem *umem;
-	void *buffer;
-};
 
-//Pas trop nécessaire
-struct stats_record {
-	uint64_t timestamp;
-	uint64_t rx_packets;
-	uint64_t rx_bytes;
-	uint64_t tx_packets;
-	uint64_t tx_bytes;
-};
-
-struct xsk_socket_info {
-	struct xsk_ring_cons rx;
-	struct xsk_ring_prod tx;
-	struct xsk_umem_info *umem;
-	struct xsk_socket *xsk;
-
-	uint64_t umem_frame_addr[NUM_FRAMES];
-	uint32_t umem_frame_free;
-
-	uint32_t outstanding_tx;
-
-	struct stats_record stats; // TODO: Est-ce nécessaire ?
-	struct stats_record prev_stats; // TODO: Est-ce nécessaire ?
-};
 
 /*
- * Allocation et "création" du umem (userspace memory)
+ * configure_xsk_umem() : Allocation et "création" du umem (userspace memory)
  * 
  */
-static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size)
-{
-	struct xsk_umem_info *umem;
-	int ret;
-
-	umem = calloc(1, sizeof(*umem));
-	if (!umem)
-		return NULL;
-
-	ret = xsk_umem__create(&umem->umem, buffer, size, &umem->fq, &umem->cq,
-			       NULL);
-	if (ret) {
-		errno = -ret;
-		return NULL;
-	}
-
-	umem->buffer = buffer;
-	return umem;
-}
-
-static uint64_t xsk_alloc_umem_frame(struct xsk_socket_info *xsk)
-{
-	uint64_t frame;
-	if (xsk->umem_frame_free == 0)
-		return INVALID_UMEM_FRAME;
-
-	frame = xsk->umem_frame_addr[--xsk->umem_frame_free];
-	xsk->umem_frame_addr[xsk->umem_frame_free] = INVALID_UMEM_FRAME;
-	return frame;
-}
-
-//TODO: à modifier...
-static struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
-						    struct xsk_umem_info *umem)
-{
-	struct xsk_socket_config xsk_cfg;
-	struct xsk_socket_info *xsk_info;
-	uint32_t idx;
-	uint32_t prog_id = 0;
-	int i;
-	int ret;
-
-	xsk_info = calloc(1, sizeof(*xsk_info));
-	if (!xsk_info)
-		return NULL;
-
-	xsk_info->umem = umem;
-	xsk_cfg.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS;
-	xsk_cfg.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS;
-	xsk_cfg.libbpf_flags = 0;
-	xsk_cfg.xdp_flags = cfg->xdp_flags;
-	xsk_cfg.bind_flags = cfg->xsk_bind_flags;
-	ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
-				 cfg->xsk_if_queue, umem->umem, &xsk_info->rx,
-				 &xsk_info->tx, &xsk_cfg);
-
-	if (ret)
-		goto error_exit;
-
-	//TODO: A revoir...
-	ret = bpf_get_link_xdp_id(cfg->ifindex, &prog_id, cfg->xdp_flags);
-	if (ret)
-		goto error_exit;
-
-	/* Initialize umem frame allocation */
-
-	for (i = 0; i < NUM_FRAMES; i++)
-		xsk_info->umem_frame_addr[i] = i * FRAME_SIZE;
-
-	xsk_info->umem_frame_free = NUM_FRAMES;
-
-	/* Stuff the receive path with buffers, we assume we have enough */
-	ret = xsk_ring_prod__reserve(&xsk_info->umem->fq,
-				     XSK_RING_PROD__DEFAULT_NUM_DESCS,
-				     &idx);
-
-	if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS)
-		goto error_exit;
-
-	for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS; i ++)
-		*xsk_ring_prod__fill_addr(&xsk_info->umem->fq, idx++) =
-			xsk_alloc_umem_frame(xsk_info);
-
-	xsk_ring_prod__submit(&xsk_info->umem->fq,
-			      XSK_RING_PROD__DEFAULT_NUM_DESCS);
-
-	return xsk_info;
-
-error_exit:
-	errno = -ret;
-	return NULL;
-}
-
-static void xsk_free_umem_frame(struct xsk_socket_info *xsk, uint64_t frame)
-{
-	assert(xsk->umem_frame_free < NUM_FRAMES);
-
-	xsk->umem_frame_addr[xsk->umem_frame_free++] = frame;
-}
-
-static uint64_t xsk_umem_free_frames(struct xsk_socket_info *xsk)
-{
-	return xsk->umem_frame_free;
-}
-
 // Fonction principale de traitement de paquet dans
 // l'espace utilisateur
 // Véritable fonction pour le traitement de paquets reçus sur af_xdp socket
@@ -336,7 +201,7 @@ static void handle_receive_packets(struct xsk_socket_info *xsk)
 	//complete_tx(xsk); //TODO: Est-ce nécessaire ?
 }
 
-static void rx_and_process(struct config *cfg,
+static void rx_and_process(struct xdp_config *cfg,
 			   struct xsk_socket_info *xsk_socket)
 {	
 	// Pas trop bien compris...
@@ -363,37 +228,36 @@ static void rx_and_process(struct config *cfg,
 
 int main(int argc, char **argv)
 {
-    int ret;
-    //char *ifname = "veth-adv03";
+    	int ret;
+    	//char *ifname = "veth-adv03";
+	int xsks_map_fd;
 	void *packet_buffer;
 	uint64_t packet_buffer_size;
+
 	struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
-    struct config cfg = {
-        .ifindex = if_nametoindex(NIC_NAME),
-        .ifname = NIC_NAME,
-        .do_unload = false,
+    	struct xdp_config cfg = {
 		.filename = XDP_FILENAME,
-		.progsec = "xdp_sock"
-    };
-
-    struct xsk_umem_info *umem;
+		.progsec = "xdp_sock",
+		.do_unload = false,
+		.ifname = NIC_NAME	
+    	};
+	
+    	struct xsk_umem_info *umem;
 	struct xsk_socket_info *xsk_socket;
-
-    int xsks_map_fd;
 	struct bpf_object *bpf_obj = NULL;
 
-    if (cfg.ifindex == -1) {
+        if (cfg.ifindex == -1) {
 		fprintf(stderr, "ERROR: Required option --dev missing\n\n");
 		return EXIT_FAIL_OPTION;
 	}
 
-    if (cfg.filename[0] == 0)
-        return EXIT_FAIL;
+        if (cfg.filename[0] == 0)
+        	return EXIT_FAIL;
     
-    /* Chargement de programme XDP... */
-    struct bpf_map *map;
+    	/* Chargement de programme XDP... */
+    	struct bpf_map *map;
 
-    bpf_obj = load_bpf_and_xdp_attach(&cfg);
+    	bpf_obj = load_bpf_and_xdp_attach(&cfg);
 	if (!bpf_obj) {
 		/* Error handling done in load_bpf_and_xdp_attach() */
 		exit(EXIT_FAILURE);
@@ -408,9 +272,9 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-    /* Code pour l'utilisation des af_xdp sockets */
+    	/* Code pour l'utilisation des af_xdp sockets */
 
-    /* Allow unlimited locking of memory, so all memory needed for packet
+   	/* Allow unlimited locking of memory, so all memory needed for packet
 	 * buffers can be locked.
 	 */
 	if (setrlimit(RLIMIT_MEMLOCK, &rlim)) {
@@ -419,7 +283,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-     /* Allocate memory for NUM_FRAMES of the default XDP frame size */
+     	/* Allocate memory for NUM_FRAMES of the default XDP frame size */
 	// getpagesize: obtenir des pages mémoires du système
 	packet_buffer_size = NUM_FRAMES * FRAME_SIZE;
 
@@ -451,7 +315,7 @@ int main(int argc, char **argv)
     
 	// Ai-je besoin d'un thread pour afficher les statistiques
 	//Et quelle statistique ?
-    //Pas trop besoin pour le moment...
+    	//Pas trop besoin pour le moment...
 
 	/* Receive and count packets than drop them */
 	rx_and_process(&cfg, xsk_socket);

@@ -1,14 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
-//TODO: Réécrire les include
-//#include <linux/bpf.h>
-//#include "bpf_helpers.h"
-
-#include "../../headers/linux/bpf.h"
-#include "../../headers/bpf_helpers.h"
-
 #include <linux/if_ether.h>
 #include <linux/ip.h>
+
+#include <linux/bpf.h>
+#include "bpf_helpers.h"
 
 struct bpf_map_def SEC("maps") xsks_map = {
 	.type = BPF_MAP_TYPE_XSKMAP,
@@ -35,37 +31,37 @@ struct bpf_map_def SEC("maps") xsks_map = {
 SEC("xdp_sock")
 int xdp_sock_prog(struct xdp_md *ctx)
 {
-    int index = ctx->rx_queue_index;
-    //__u32 *pkt_count;
+        int index = ctx->rx_queue_index;
+        //__u32 *pkt_count;
 
-   /* pkt_count = bpf_map_lookup_elem(&xdp_stats_map, &index);
-    if (pkt_count) {
+        /* pkt_count = bpf_map_lookup_elem(&xdp_stats_map, &index);
+        if (pkt_count) {
 
-        // We pass every other packet 
-        if ((*pkt_count)++ & 1)
-            return XDP_PASS;
-    } */
+            // We pass every other packet 
+            if ((*pkt_count)++ & 1)
+                return XDP_PASS;
+        } */
 
-    /* A set entry here means that the correspnding queue_id
-     * has an active AF_XDP socket bound to it. */
+        /* A set entry here means that the correspnding queue_id
+        * has an active AF_XDP socket bound to it. */
 
-    void *data = (void *)(long)ctx->data;
-    void *data_end = (void *)(long)ctx->data_end;
+        void *data = (void *)(long)ctx->data;
+        void *data_end = (void *)(long)ctx->data_end;
 
-    struct ethhdr *eth = (struct ethhdr *)data;
-    if(eth + 1 > data_end)
-        return XDP_DROP;
-    
-	struct iphdr *iph = (struct iphdr *)(eth + ETH_HLEN);
-    if(iph + 1 > data_end)
-        return XDP_DROP;
-    
-    bpf_printk("ip protocol : %d\n", iph->protocol);
+        struct ethhdr *eth = (struct ethhdr *)data;
+        if(eth + 1 > data_end)
+            return XDP_DROP;
+        
+        struct iphdr *iph = (struct iphdr *)(eth + ETH_HLEN);
+        if(iph + 1 > data_end)
+            return XDP_DROP;
+        
+        bpf_printk("ip protocol : %d\n", iph->protocol);
 
-    if (bpf_map_lookup_elem(&xsks_map, &index))
-        return bpf_redirect_map(&xsks_map, index, 0);
+        if (bpf_map_lookup_elem(&xsks_map, &index))
+            return bpf_redirect_map(&xsks_map, index, 0);
 
-    return XDP_PASS;
+        return XDP_PASS;
 }
 
 char _license[] SEC("license") = "GPL";

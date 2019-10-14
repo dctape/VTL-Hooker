@@ -4,6 +4,7 @@
 #include <bpf/xsk.h>
 // Faire attention
 #include "common_defines.h"
+#include "common_user_bpf_xdp.h" //TODO: change later
 
 #define NUM_FRAMES         4096
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
@@ -45,7 +46,7 @@ struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size);
 uint64_t xsk_alloc_umem_frame(struct xsk_socket_info *xsk);
 void xsk_free_umem_frame(struct xsk_socket_info *xsk, uint64_t frame);
 uint64_t xsk_umem_free_frames(struct xsk_socket_info *xsk);
-struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
+struct xsk_socket_info *xsk_configure_socket(struct xdp_config *xdp_cfg,
 						    struct xsk_umem_info *umem);
 
 

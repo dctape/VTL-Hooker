@@ -63,7 +63,7 @@ uint64_t xsk_umem_free_frames(struct xsk_socket_info *xsk)
 	return xsk->umem_frame_free;
 }
 
-struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
+struct xsk_socket_info *xsk_configure_socket(struct xdp_config *xdp_cfg,
 					     struct xsk_umem_info *umem)
 {
 	struct xsk_socket_config xsk_cfg;
@@ -81,16 +81,16 @@ struct xsk_socket_info *xsk_configure_socket(struct config *cfg,
 	xsk_cfg.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS;
 	xsk_cfg.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS;
 	xsk_cfg.libbpf_flags = 0;
-	xsk_cfg.xdp_flags = cfg->xdp_flags;
-	xsk_cfg.bind_flags = cfg->xsk_bind_flags;
-	ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
-				 cfg->xsk_if_queue, umem->umem, &xsk_info->rx,
+	xsk_cfg.xdp_flags = xdp_cfg->xdp_flags;
+	xsk_cfg.bind_flags = xdp_cfg->xsk_bind_flags;
+	ret = xsk_socket__create(&xsk_info->xsk, xdp_cfg->ifname,
+				 xdp_cfg->xsk_if_queue, umem->umem, &xsk_info->rx,
 				 &xsk_info->tx, &xsk_cfg);
 
 	if (ret)
 		goto error_exit;
 
-	ret = bpf_get_link_xdp_id(cfg->ifindex, &prog_id, cfg->xdp_flags);
+	ret = bpf_get_link_xdp_id(xdp_cfg->ifindex, &prog_id, xdp_cfg->xdp_flags);
 	if (ret)
 		goto error_exit;
 

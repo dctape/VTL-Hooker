@@ -1,6 +1,7 @@
 {
         "files.associations": {
                 "stdlib.h": "c",
-                "common_defines.h": "c"
+                "common_defines.h": "c",
+                "common_user_bpf_xsk.h": "c"
         }
 }

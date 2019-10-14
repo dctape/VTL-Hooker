@@ -11,6 +11,7 @@
 
 #include "common_defines.h"
 #include "common_libbpf.h"
+#include "common_user_bpf_xdp.h"
 
 // load_bpf_object_file => common_libbpf
 // open_bpf_object  => common_libbpf
@@ -110,7 +111,7 @@ int xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id)
 	return EXIT_OK;
 }
 
-struct bpf_object *load_bpf_and_xdp_attach(struct config *cfg)
+struct bpf_object *load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg)
 {
 	struct bpf_program *bpf_prog;
 	struct bpf_object *bpf_obj;
@@ -120,24 +121,24 @@ struct bpf_object *load_bpf_and_xdp_attach(struct config *cfg)
 
 	/* If flags indicate hardware offload, supply ifindex */
 	// Si le mode hardware est activé alors...
-	if (cfg->xdp_flags & XDP_FLAGS_HW_MODE)
-		offload_ifindex = cfg->ifindex;
+	if (xdp_cfg->xdp_flags & XDP_FLAGS_HW_MODE)
+		offload_ifindex = xdp_cfg->ifindex;
 
 	/* Load the BPF-ELF object file and get back libbpf bpf_object */
 	// Si
-	if (cfg->reuse_maps)
-		bpf_obj = load_bpf_object_file_reuse_maps(cfg->filename,
-							  cfg->prog_type,
+	if (xdp_cfg->reuse_maps)
+		bpf_obj = load_bpf_object_file_reuse_maps(xdp_cfg->filename,
+							  BPF_PROG_TYPE_XDP,
 							  offload_ifindex,
-							  cfg->pin_dir);
+							  xdp_cfg->pin_dir);
 	else
-		bpf_obj = load_bpf_object_file(cfg->filename,		 
-					       cfg->prog_type,
+		bpf_obj = load_bpf_object_file(xdp_cfg->filename,		 
+					       BPF_PROG_TYPE_XDP,
 		 			       offload_ifindex);
 
 	if (!bpf_obj)
 	{
-		fprintf(stderr, "ERR: loading file: %s\n", cfg->filename);
+		fprintf(stderr, "ERR: loading file: %s\n", xdp_cfg->filename);
 		exit(EXIT_FAIL_BPF);
 	}
 
@@ -147,9 +148,9 @@ struct bpf_object *load_bpf_and_xdp_attach(struct config *cfg)
 	 * process exit.
 	 */
 
-	if (cfg->progsec[0])
+	if (xdp_cfg->progsec[0])
 		/* Find a matching BPF prog section name */
-		bpf_prog = bpf_object__find_program_by_title(bpf_obj, cfg->progsec);
+		bpf_prog = bpf_object__find_program_by_title(bpf_obj, xdp_cfg->progsec);
 	else
 		/* Find the first program */
 		// Contient un seul programme BPF
@@ -157,11 +158,11 @@ struct bpf_object *load_bpf_and_xdp_attach(struct config *cfg)
 
 	if (!bpf_prog)
 	{
-		fprintf(stderr, "ERR: couldn't find a program in ELF section '%s'\n", cfg->progsec);
+		fprintf(stderr, "ERR: couldn't find a program in ELF section '%s'\n",xdp_cfg->progsec);
 		exit(EXIT_FAIL_BPF);
 	}
 
-	strncpy(cfg->progsec, bpf_program__title(bpf_prog, false), sizeof(cfg->progsec));
+	strncpy(xdp_cfg->progsec, bpf_program__title(bpf_prog, false), sizeof(xdp_cfg->progsec));
 
 	prog_fd = bpf_program__fd(bpf_prog);
 	if (prog_fd <= 0)
@@ -174,7 +175,7 @@ struct bpf_object *load_bpf_and_xdp_attach(struct config *cfg)
 	 * is our select file-descriptor handle. Next step is attaching this FD
 	 * to a kernel hook point, in this case XDP net_device link-level hook.
 	 */
-	err = xdp_link_attach(cfg->ifindex, cfg->xdp_flags, prog_fd);
+	err = xdp_link_attach(xdp_cfg->ifindex, xdp_cfg->xdp_flags, prog_fd);
 	if (err)
 		exit(err);
 
