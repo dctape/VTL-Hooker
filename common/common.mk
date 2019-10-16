@@ -75,10 +75,12 @@ all: llvm-check $(USER_TARGETS) $(KERN_OBJ)
 .PHONY: clean $(CLANG) $(LLC)
 
 ## TODO: peut-être ajouter : mrproper ??
+##TODO: add clean USER_DEPS
 clean:
 	rm -rf $(LIBBPF_DIR)/build
 	$(MAKE) -C $(LIBBPF_DIR) clean
 	$(MAKE) -C $(COMMON_DIR) clean
+	# $(MAKE) -C $(ADAPTER_DIR) clean
 #	rm -f $(USER_TARGETS) $(XDP_OBJ) $(USER_OBJ) $(COPY_LOADER) $(COPY_STATS)
 	rm -f $(USER_TARGETS) $(KERN_OBJ) $(USER_OBJ)
 	rm -f *.ll

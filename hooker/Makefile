@@ -7,27 +7,28 @@ LIBBPF_DIR = ../libbpf/src/
 COMMON_DIR = ../common/
 LIB_DIR = ../lib
 
-# DEPS_DIR = ./ => Boucle infinie
+ADAPTER_DIR = ./adapter
+UDP_DIR = ./udp
 
-## sub-make for user dependencies
 
-include dependencies.mk
+all: make-adapter make-udp
+
+make-adapter:
+	make -C $(ADAPTER_DIR)
+
+make-udp:
+	make -C $(UDP_DIR)
+
+
 include $(COMMON_DIR)/common.mk
 
 LIBS += -lpthread
 
-ADAPTER_OBJ = adapter.o
-UDP_OBJ = udp.o
+ADAPTER_OBJ = $(ADAPTER_DIR)/adapter.o
+UDP_OBJ = $(UDP_DIR)/udp.o
 
 USER_DEPS := $(ADAPTER_OBJ)
 USER_DEPS += $(UDP_OBJ)
 
 KERN_DEPS = $(LIB_DIR)/maps.h
 
-# all: $(ADAPTER_OBJ) $(UDP_OBJ)
-
-# $(ADAPTER_OBJ): adapter.c $(LIB_DIR)/config.h
-# 	$(CC) $(CFLAGS) -o $@ -c $<
-
-# $(UDP_OBJ): udp.c $(LIB_DIR)/config.h
-# 	$(CC) $(CFLAGS) -o $@ -c $<

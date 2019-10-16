@@ -36,13 +36,13 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
-#include "../common/common_defines.h" // for struct config or common_params ??
-#include "../common/common_user_cgroup.h"
-#include "../common/common_user_bpf_socket.h"
+#include "../common/defines.h" // for struct config or common_params ??
+#include "../common/cgroup_helpers.h"
+#include "../common/sock_user_helpers.h"
 
-
-#include "adapter.h"
-#include "udp.h"
+//TODO: mettre toutes les dépendances dans un dossier ?
+#include "./adapter/adapter.h"
+#include "./udp/udp.h"
 
 // TODO: le configurer dans le makefile
 #define REDIRECTOR_KERN_FILENAME       "redirector_kern_1.o" // hooker1
