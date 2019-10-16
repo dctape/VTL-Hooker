@@ -10,7 +10,7 @@
 #include <linux/if_link.h> /* XDP_FLAGS_* depend on kernel-headers installed */
 #include <linux/if_xdp.h>
 
-#include "common_params.h"
+#include "params.h"
 
 int verbose = 1;
 

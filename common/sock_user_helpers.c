@@ -1,8 +1,3 @@
-/*
- *
- * fonctions pour l'injection de programmes sur skmsg et sockops
- * 
- */ 
 
 #include <errno.h>
 #include <stdio.h>
@@ -12,11 +7,12 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
-#include "common_defines.h"
-#include "common_libbpf.h"
-
-#include "../lib/config.h" // pour la définition sock_key_t
+#include "defines.h"
+#include "util_libbpf.h"
 // TODO : Trouver une meilleure alternative
+#include "../lib/config.h" // pour la définition sock_key_t
+
+#include "sock_user_helpers.h"
 
 
 

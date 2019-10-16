@@ -1,43 +1,37 @@
 # SPDX-License-Identifier: (GPL-2.0)
+
+TARGETS := params
+TARGETS += util_libbpf
+TARGETS += util_user_maps
+TARGETS += cgroup_helpers
+TARGETS += sock_user_helpers
+TARGETS += tc_user_helpers
+TARGETS += xdp_user_helpers
+TARGETS += xsk_user_helpers
+
 CC := gcc
-
-# TODO : améliorer cette partie
-all: common_params.o common_libbpf.o \
-     common_user_bpf_xdp.o \
-     common_user_bpf_xsk.o \
-     common_user_cgroup.o \
-     common_user_bpf_socket.o \
-     common_user_bpf_tc.o
-
 CFLAGS := -g -Wall
 
 LIBBPF_DIR = ../libbpf/src/
 CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
+
+# TODO : améliorer cette partie
 # TODO: Do we need to make libbpf from this make file too?
-
-common_params.o: common_params.c common_params.h
-	$(CC) $(CFLAGS) -c -o $@ $<
-common_libbpf.o: common_libbpf.c common_libbpf.h
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-## TODO: modify it
-common_user_bpf_xdp.o: common_user_bpf_xdp.c common_libbpf.h common_user_bpf_xdp.h 	
-	$(CC) $(CFLAGS) -c -o $@ $< 
-
-## add common_libbpf.h ?
-common_user_bpf_xsk.o: common_user_bpf_xsk.c common_user_bpf_xsk.h 	
-	$(CC) $(CFLAGS) -c -o $@ $< 
-
-common_user_cgroup.o: common_user_cgroup.c common_user_cgroup.h 	
-	$(CC) $(CFLAGS) -c -o $@ $< 
-
-common_user_bpf_socket.o: common_user_bpf_socket.c common_libbpf.h common_user_bpf_socket.h	
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-common_user_bpf_tc.o: common_user_bpf_tc.c common_user_bpf_tc.h
-	$(CC) $(CFLAGS) -c -o $@ $<
+all: $(TARGETS)
 
 .PHONY: clean
 
 clean:
 	rm -f *.o
+
+%.o: %.c %.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+
+#TODO: add common_libbpf.h ?
+# common_user_bpf_xdp.o: common_user_bpf_xdp.c common_libbpf.h common_user_bpf_xdp.h 	
+# 	$(CC) $(CFLAGS) -c -o $@ $< 
+#common_user_bpf_socket.o: common_user_bpf_socket.c common_libbpf.h common_user_bpf_socket.h
+
+
+

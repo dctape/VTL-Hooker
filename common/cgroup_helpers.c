@@ -4,7 +4,6 @@
  */
 
 #define _GNU_SOURCE //for strdup
-//#include "util.h"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -17,7 +16,7 @@
 #include <fcntl.h>
 #include <mntent.h>
 
-#include "common_user_cgroup.h"
+#include "cgroup_helpers.h"
 
 /* retourne le chemin du cgroup root */
 char *find_cgroup_root(void)  // pas nécessaire

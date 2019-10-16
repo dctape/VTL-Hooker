@@ -1,3 +1,4 @@
+
 #include <string.h>     /* strerror */
 #include <net/if.h>     /* IF_NAMESIZE */
 #include <stdlib.h>     /* exit(3) */
@@ -9,19 +10,120 @@
 #include <linux/if_link.h> /* Need XDP flags */
 #include <linux/err.h>
 
-#include "common_defines.h"
-#include "common_libbpf.h"
-#include "common_user_bpf_xdp.h"
-
-// load_bpf_object_file => common_libbpf
-// open_bpf_object  => common_libbpf
-// reuse_maps => common_libbpf
-// load_bpf_object_file_reuse_maps - à modifier => common_libbpf
-// check_map_fd_info => common_libbpf
-// open_bpf_map_file => common_libbpf
+#include "defines.h"
+//#include "common_libbpf.h"
+#include "util_user_maps.h"
+#include "xdp_user_helpers.h"
 
 
-int xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd)
+static struct bpf_object *
+load_bpf_object_file(const char *filename, int ifindex)
+{
+	int bpf_prog_fd = -1;
+	struct bpf_object *bpf_obj;
+	int err;
+
+	/* This struct allow us to set ifindex, this features is used for
+	 * hardware offloading XDP programs (note this sets libbpf
+	 * bpf_program->prog_ifindex and foreach bpf_map->map_ifindex).
+	 */
+	struct bpf_prog_load_attr prog_load_attr = {
+		.prog_type = BPF_PROG_TYPE_XDP,
+		.ifindex   = ifindex,
+	};
+	prog_load_attr.file = filename;
+
+	/* Use libbpf for extracting BPF byte-code from BPF-ELF object, and
+	 * loading this into the kernel via bpf-syscall
+	 */
+	err = bpf_prog_load_xattr(&prog_load_attr, &bpf_obj, &bpf_prog_fd);
+	if (err) {
+		fprintf(stderr, "ERR: loading BPF-OBJ file(%s) (%d): %s\n",
+			filename, err, strerror(-err));
+		return NULL;
+	}
+
+	return bpf_obj;
+}
+
+// Pour l'instant spécifique à XDP
+static struct bpf_object *
+open_bpf_object(const char *file, int ifindex)
+{
+	int err;
+	struct bpf_object *obj;
+	struct bpf_map *map;
+	struct bpf_program *prog, *first_prog = NULL;
+
+	struct bpf_object_open_attr open_attr = {
+		.file = file,
+		.prog_type = BPF_PROG_TYPE_XDP,
+	};
+
+	obj = bpf_object__open_xattr(&open_attr);
+	if (IS_ERR_OR_NULL(obj)) {
+		err = -PTR_ERR(obj);
+		fprintf(stderr, "ERR: opening BPF-OBJ file(%s) (%d): %s\n",
+			file, err, strerror(-err));
+		return NULL;
+	}
+
+	bpf_object__for_each_program(prog, obj) {
+		bpf_program__set_type(prog, BPF_PROG_TYPE_XDP);
+		bpf_program__set_ifindex(prog, ifindex);
+		if (!first_prog)
+			first_prog = prog;
+	}
+
+	bpf_object__for_each_map(map, obj) {
+		if (!bpf_map__is_offload_neutral(map))
+			bpf_map__set_ifindex(map, ifindex);
+	}
+
+	if (!first_prog) {
+		fprintf(stderr, "ERR: file %s contains no programs\n", file);
+		return NULL;
+	}
+
+	return obj;
+}
+
+// Charger le fichier ELF-BPF en réutilisant les maps
+// Epingler dans un fichier
+// Pour l'instant spécifique à xdp...changer plus tard!
+static struct bpf_object *
+load_bpf_object_file_reuse_maps(const char *file,
+				int ifindex,
+				const char *pin_dir)
+{
+	int err;
+	struct bpf_object *obj;
+
+	obj = open_bpf_object(file, ifindex);
+	if (!obj) {
+		fprintf(stderr, "ERR: failed to open object %s\n", file);
+		return NULL;
+	}
+
+	err = reuse_maps(obj, pin_dir);
+	if (err) {
+		fprintf(stderr, "ERR: failed to reuse maps for object %s, pin_dir=%s\n",
+				file, pin_dir);
+		return NULL;
+	}
+
+	err = bpf_object__load(obj);
+	if (err) {
+		fprintf(stderr, "ERR: loading BPF-OBJ file(%s) (%d): %s\n",
+			file, err, strerror(-err));
+		return NULL;
+	}
+
+	return obj;
+}
+
+int 
+xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd)
 {
 	int err;
 
@@ -68,7 +170,8 @@ int xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd)
 	return EXIT_OK;
 }
 
-int xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id)
+int 
+xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id)
 {
 	__u32 curr_prog_id;
 	int err;
@@ -111,7 +214,8 @@ int xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id)
 	return EXIT_OK;
 }
 
-struct bpf_object *load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg)
+struct bpf_object *
+load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg)
 {
 	struct bpf_program *bpf_prog;
 	struct bpf_object *bpf_obj;
@@ -128,13 +232,10 @@ struct bpf_object *load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg)
 	// Si
 	if (xdp_cfg->reuse_maps)
 		bpf_obj = load_bpf_object_file_reuse_maps(xdp_cfg->filename,
-							  BPF_PROG_TYPE_XDP,
 							  offload_ifindex,
 							  xdp_cfg->pin_dir);
 	else
-		bpf_obj = load_bpf_object_file(xdp_cfg->filename,		 
-					       BPF_PROG_TYPE_XDP,
-		 			       offload_ifindex);
+		bpf_obj = load_bpf_object_file(xdp_cfg->filename, offload_ifindex);
 
 	if (!bpf_obj)
 	{

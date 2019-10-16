@@ -2,17 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common_user_bpf_tc.h"
+#include "tc_user_helpers.h"
 
-
-//int verbose = 1; /* déjà défini dans common_params.o */
-
-//paramétrage commmande tc
+/* paramétrage commmande tc */
 #define CMD_MAX 	2048
 #define CMD_MAX_TC	256
 static char tc_cmd[CMD_MAX_TC] = "tc";
 
-int tc_egress_attach_bpf(struct config *cfg)
+int tc_egress_attach_bpf(struct tc_config *cfg)
 {
 	char cmd[CMD_MAX];
 	int ret = 0;
@@ -21,7 +18,7 @@ int tc_egress_attach_bpf(struct config *cfg)
 	memset(&cmd, 0, CMD_MAX);
 	snprintf(cmd, CMD_MAX,
 		 "%s qdisc del dev %s clsact 2> /dev/null",
-		 tc_cmd, cfg->ifname);
+		 tc_cmd, cfg->dev);
 	if (verbose) printf(" - Run: %s\n", cmd);
 	ret = system(cmd); // Very interesting !!!
 	if (!WIFEXITED(ret)) {
@@ -38,7 +35,7 @@ int tc_egress_attach_bpf(struct config *cfg)
 	memset(&cmd, 0, CMD_MAX);
 	snprintf(cmd, CMD_MAX,
 		 "%s qdisc add dev %s clsact",
-		 tc_cmd, cfg->ifname);
+		 tc_cmd, cfg->dev);
 	if (verbose) printf(" - Run: %s\n", cmd);
 	ret = system(cmd);
 	if (ret) {
@@ -53,7 +50,7 @@ int tc_egress_attach_bpf(struct config *cfg)
 	snprintf(cmd, CMD_MAX,
 		 "%s filter add dev %s "
 		 "egress prio 1 handle 1 bpf da obj %s sec tf_tc_egress",
-		 tc_cmd, cfg->ifname, cfg->filename); // TODO: adapt that line for our use cases
+		 tc_cmd, cfg->dev, cfg->filename); // TODO: adapt that line for our use cases
     //TODO : - find why prio 1 handle 1
     //       - change sec ingress_redirect to section name of my bpf file    
 	if (verbose) printf(" - Run: %s\n", cmd);
@@ -69,7 +66,7 @@ int tc_egress_attach_bpf(struct config *cfg)
 }
 
 /* Remove bpf program on tc egress path  */
-int tc_remove_egress(struct config *cfg)
+int tc_remove_egress(struct tc_config *cfg)
 {
 	char cmd[CMD_MAX];
 	int ret = 0;
@@ -81,7 +78,7 @@ int tc_remove_egress(struct config *cfg)
 		 /* Alternatively could remove specific filter handle:
 		 "%s filter delete dev %s ingress prio 1 handle 1 bpf",
 		 */
-		 tc_cmd, cfg->ifname);
+		 tc_cmd, cfg->dev);
 	if (verbose) printf(" - Run: %s\n", cmd);
 	ret = system(cmd);
 	if (ret) {

@@ -1,10 +1,12 @@
-#ifndef __COMMON_USER_BPF_XSK_H
-#define __COMMON_USER_BPF_XSK_H
+#ifndef __XSK_USER_HELPERS_H
+#define __XSK_USER_HELPERS_H
 
 #include <bpf/xsk.h>
 // Faire attention
-#include "common_defines.h"
-#include "common_user_bpf_xdp.h" //TODO: change later
+#include "defines.h"
+//TODO: change later
+// Afin de réduire le code à inclure
+#include "xdp_user_helpers.h" 
 
 #define NUM_FRAMES         4096
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
@@ -50,4 +52,4 @@ struct xsk_socket_info *xsk_configure_socket(struct xdp_config *xdp_cfg,
 						    struct xsk_umem_info *umem);
 
 
-#endif  /*__COMMON_USER_BPF_XSK_H */
+#endif  /*__XSK_USER_HELPERS_H */

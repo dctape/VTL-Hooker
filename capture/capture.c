@@ -41,7 +41,8 @@
 
 
 
-#define XDP_FILENAME       		"capture_kern.o"
+//#define XDP_FILENAME       		"capture_kern.o"
+#define XDP_FILENAME       		"af_xdp_kern.o"
 #define NIC_NAME		   	"ens33"
 #define IPPROTO_VTL 			200
 
@@ -239,9 +240,15 @@ int main(int argc, char **argv)
 		.filename = XDP_FILENAME,
 		.progsec = "xdp_sock",
 		.do_unload = false,
-		.ifname = NIC_NAME	
+		.ifindex = if_nametoindex(NIC_NAME),
+		.ifname = NIC_NAME // sert pas à grande chose de le préciser !!	
     	};
 	
+	cfg.xdp_flags &= ~XDP_FLAGS_MODES;    /* Clear flags */
+	cfg.xdp_flags |= XDP_FLAGS_SKB_MODE;  /* Set   flag */
+	cfg.xsk_bind_flags &= XDP_ZEROCOPY;
+	cfg.xsk_bind_flags |= XDP_COPY;
+
     	struct xsk_umem_info *umem;
 	struct xsk_socket_info *xsk_socket;
 	struct bpf_object *bpf_obj = NULL;

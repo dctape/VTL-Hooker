@@ -1,9 +1,9 @@
 /* This common_user.h is used by userspace programs */
-#ifndef __COMMON_PARAMS_H
-#define __COMMON_PARAMS_H
+#ifndef __PARAMS_H
+#define __PARAMS_H
 
 #include <getopt.h>
-#include "common_defines.h"
+#include "defines.h"
 
 struct option_wrapper {
   struct option option;
@@ -19,4 +19,4 @@ void parse_cmdline_args(int argc, char **argv,
 			const struct option_wrapper *long_options,
                         struct config *cfg, const char *doc);
 
-#endif /* __COMMON_PARAMS_H */
+#endif /*__PARAMS_H */

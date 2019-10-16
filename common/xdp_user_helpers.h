@@ -1,8 +1,11 @@
 /* Common BPF/XDP functions used by userspace side programs */
-#ifndef __COMMON_USER_BPF_XDP_H
-#define __COMMON_USER_BPF_XDP_H
+#ifndef __XDP_USER_HELPERS_H
+#define __XDP_USER_HELPERS_H
 
-#include <bpf/libbpf.h>
+#include <linux/types.h>
+#include <net/if.h>
+
+//#include <bpf/libbpf.h>
 //#include "common_libbpf.h"
 
 struct xdp_config {
@@ -37,4 +40,4 @@ int xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id);
 struct bpf_object *load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg);
 
 
-#endif /* __COMMON_USER_BPF_XDP_H */
+#endif /*__XDP_USER_HELPERS_H */

@@ -1,12 +1,12 @@
-#ifndef __COMMON_DEFINES_H
-#define __COMMON_DEFINES_H
+#ifndef __DEFINES_H
+#define __DEFINES_H
 
 #include <net/if.h>
 #include <linux/types.h>
 #include <stdbool.h>
 
-//#include <bpf/bpf.h> // pour enum bpf_prog_type
-// Pas nécessaire
+
+//TODO: supprimer struct config car pas plus nécessaire
 struct config {
 	
 	int prog_type[3]; /* Nombre maximal de programme eBPF par fichier */
@@ -34,11 +34,11 @@ struct config {
 	__u16 xsk_bind_flags;
 	int xsk_if_queue;
 	bool xsk_poll_mode;
-//	int redirect_ifindex;
-//	char *redirect_ifname;
-//	char redirect_ifname_buf[IF_NAMESIZE];	
-	// char src_mac[18];
-	// char dest_mac[18];
+	int redirect_ifindex;
+	char *redirect_ifname;
+	char redirect_ifname_buf[IF_NAMESIZE];	
+	char src_mac[18];
+	char dest_mac[18];
 	
 };
 
@@ -52,4 +52,4 @@ extern int verbose;
 #define EXIT_FAIL_XDP		30
 #define EXIT_FAIL_BPF		40
 
-#endif /* __COMMON_DEFINES_H */
+#endif /*__DEFINES_H */

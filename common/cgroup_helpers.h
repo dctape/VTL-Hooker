@@ -4,8 +4,8 @@
  * 
  */
 
-#ifndef __COMMON_USER_CGROUP_H
-#define __COMMON_USER_CGROUP_H
+#ifndef __CGROUP_HELPERS_H
+#define __CGROUP_HELPERS_H
 
 #include <stdio.h>
 #include <string.h>
@@ -22,4 +22,4 @@ int get_cgroup_root_fd(void);
 //bool validate_ifname(const char* input_ifname, char *output_ifname);
 
 
-#endif /* __COMMON_USER_CGROUP_H */
+#endif /*__CGROUP_HELPERS_H */
