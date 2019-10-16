@@ -31,13 +31,15 @@ LIBBPF_DIR ?= ../libbpf/src/
 OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
 
 # Extend if including Makefile already added some
-COMMON_OBJS +=  $(COMMON_DIR)/common_params.o \
-		$(COMMON_DIR)/common_libbpf.o \
-		$(COMMON_DIR)/common_user_bpf_xdp.o \
-		$(COMMON_DIR)/common_user_bpf_xsk.o \
-		$(COMMON_DIR)/common_user_cgroup.o \
-		$(COMMON_DIR)/common_user_bpf_socket.o \
-		$(COMMON_DIR)/common_user_bpf_tc.o
+# TODO: find a better way to include common_objs
+COMMON_OBJS +=  $(COMMON_DIR)/params.o \
+		$(COMMON_DIR)/util_libbpf.o \
+		$(COMMON_DIR)/util_user_maps.o \
+		$(COMMON_DIR)/cgroup_helpers.o \
+		$(COMMON_DIR)/sock_user_helpers.o \
+		$(COMMON_DIR)/tc_user_helpers.o \
+		$(COMMON_DIR)/xdp_user_helpers.o \
+		$(COMMON_DIR)/xsk_user_helpers.o
 	       
 
 

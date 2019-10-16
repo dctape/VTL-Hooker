@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: (GPL-2.0)
 
-TARGETS := params
-TARGETS += util_libbpf
-TARGETS += util_user_maps
-TARGETS += cgroup_helpers
-TARGETS += sock_user_helpers
-TARGETS += tc_user_helpers
-TARGETS += xdp_user_helpers
-TARGETS += xsk_user_helpers
+OBJS := params.o
+OBJS += util_libbpf.o
+OBJS += util_user_maps.o
+OBJS += cgroup_helpers.o
+OBJS += sock_user_helpers.o
+OBJS += tc_user_helpers.o
+OBJS += xdp_user_helpers.o
+OBJS += xsk_user_helpers.o
 
 CC := gcc
 CFLAGS := -g -Wall
@@ -17,12 +17,12 @@ CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
 
 # TODO : améliorer cette partie
 # TODO: Do we need to make libbpf from this make file too?
-all: $(TARGETS)
+all: $(OBJS)
 
 .PHONY: clean
 
 clean:
-	rm -f *.o
+	rm -f $(OBJS)
 
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -c -o $@ $<

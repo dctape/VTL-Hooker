@@ -3,7 +3,7 @@
 #define __ADAPTER_H
 
 #include <stdlib.h>
-#include "../lib/config.h" // est-ce utile ici ?
+#include "../../lib/config.h" // est-ce utile ici ?
 
 extern int sock_server; 
 extern int sock_redir;

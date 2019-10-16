@@ -3,7 +3,7 @@
 #define __UDP_H
 
 #include <netinet/in.h>
-#include "../lib/config.h"
+#include "../../lib/config.h"
 
 typedef struct sockaddr_in sockaddr_in_t;
 
