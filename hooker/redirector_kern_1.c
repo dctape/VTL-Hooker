@@ -102,34 +102,34 @@ int redirector_skmsg(struct sk_msg_md *msg) // TODO : use a better name...
     return SK_PASS;
 }
 
-SEC("sockops")
-int redirector_sockops(struct bpf_sock_ops *skops)
-{
-        /* add passive or active established socket  to hooker sockhash  */
+// SEC("sockops")
+// int redirector_sockops(struct bpf_sock_ops *skops)
+// {
+//         /* add passive or active established socket  to hooker sockhash  */
         
-        //int key = 0;
-        //int *value;
-        //__u32 family; 
-        __u32 op = skops->op;
+//         //int key = 0;
+//         //int *value;
+//         //__u32 family; 
+//         __u32 op = skops->op;
 
-        switch (op){
+//         switch (op){
 
-                case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB: // pas la peine d'ajouter tous les sockets
-                        bpf_printk("serveur\n");
-                        hk_add_hmap(skops);
-                break; 
+//                 case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB: // pas la peine d'ajouter tous les sockets
+//                         bpf_printk("serveur\n");
+//                         hk_add_hmap(skops);
+//                 break; 
 
-                case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
-                        bpf_printk("client\n");
-                        hk_add_hmap(skops);
+//                 case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
+//                         bpf_printk("client\n");
+//                         hk_add_hmap(skops);
 
-                break;
+//                 break;
         
-                default:
-                break;
-        } 
+//                 default:
+//                 break;
+//         } 
 
-        return 0;
-}
+//         return 0;
+// }
 
 char _license[] SEC("license") = "GPL";

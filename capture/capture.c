@@ -34,10 +34,10 @@
 #include <linux/icmpv6.h>
 
 // TODO: réduire le contenu des fichiers à inclure
-#include "../common/common_params.h"
-#include "../common/common_libbpf.h"
-#include "../common/common_user_bpf_xdp.h"
-#include "../common/common_user_bpf_xsk.h"
+#include "../common/params.h"
+#include "../common/util_libbpf.h"
+#include "../common/tc_user_helpers.h"
+#include "../common/xsk_user_helpers.h"
 
 
 

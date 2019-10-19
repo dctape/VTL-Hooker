@@ -16,29 +16,30 @@
 
 
 
-struct bpf_object *load_bpf_progs(struct config *cfg)
+struct bpf_object *
+load_bpf_progs(struct sock_bpf_config *sk_cfg)
 {
 	struct bpf_program *bpf_prog;
 	struct bpf_object *bpf_obj;
 	int i = 0;
 	long err;
 
-	bpf_obj = bpf_object__open(cfg->filename);
+	bpf_obj = bpf_object__open(sk_cfg->filename);
 	err = libbpf_get_error(bpf_obj);
 	if (err) {
 		char err_buf[256];
 
 		libbpf_strerror(err, err_buf, sizeof(err_buf));
 		fprintf(stderr,"Unable to load eBPF objects in file '%s' : %s\n",
-		       cfg->filename, err_buf);
+		       sk_cfg->filename, err_buf);
 		exit(EXIT_FAILURE);
 	}
 
 	/* Configuration des programmes de bpf_obj */
 	bpf_object__for_each_program(bpf_prog, bpf_obj) {
-		bpf_program__set_type(bpf_prog, cfg->prog_type[i]);
+		bpf_program__set_type(bpf_prog, BPF_PROG_TYPE_SK_MSG);
 		bpf_program__set_expected_attach_type(bpf_prog,
-						      cfg->prog_attach_type[i]);
+						      BPF_SK_MSG_VERDICT);
 		i++;
 	}
 

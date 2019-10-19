@@ -3,15 +3,19 @@ KERN_TARGETS  := injection_kern
 USER_TARGETS := injection
 
 LIBBPF_DIR = ../libbpf/src/
-
-#Compilation avec libbpf kernel source :
-# cela semble ne pas marcher;
-# <bpf/bpf.h> manquant
-#LIBBPF_DIR = /data/kernel/tools/lib/bpf 
 COMMON_DIR = ../common/
 
+RAW_SOCK_DIR = raw_sock
+
+all: make-rawsock
+
+make-rawsock: 
+	make -C $(RAW_SOCK_DIR)
+
 include $(COMMON_DIR)/common.mk
-# Intéressant car permet d'ajouter les bibliothèques 
-# comme l'on veut.
-CFLAGS += $(libnet-config --defines)
-LIBS += -lnet
+
+RAW_SOCK_OBJ = $(RAW_SOCK_DIR)/raw_sock.o
+USER_DEPS := $(RAW_SOCK_OBJ)
+
+# CFLAGS += $(libnet-config --defines)
+# LIBS += -lnet

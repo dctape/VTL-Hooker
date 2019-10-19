@@ -9,7 +9,10 @@
 #define CMD_MAX_TC	256
 static char tc_cmd[CMD_MAX_TC] = "tc";
 
-int tc_egress_attach_bpf(struct tc_config *cfg)
+//TODO: ajouter le nom de section
+//TODO: https://github.com/xdp-project/xdp-cpumap-tc/blob/master/src/common_user.c
+int 
+tc_egress_attach_bpf(struct tc_config *cfg)
 {
 	char cmd[CMD_MAX];
 	int ret = 0;

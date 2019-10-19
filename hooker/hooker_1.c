@@ -175,14 +175,14 @@ int main(int argc, char*argv[])
 	int err; // TODO : err or status ? choose
 	
 
-	struct config redirector_cfg = {
+	struct sock_bpf_config redirector_cfg = {
 		.filename = REDIRECTOR_KERN_FILENAME
 	};
 	redirector_cfg.prog_type[0] = BPF_PROG_TYPE_SK_MSG;
-	redirector_cfg.prog_type[1] = BPF_PROG_TYPE_SOCK_OPS;
+	//redirector_cfg.prog_type[1] = BPF_PROG_TYPE_SOCK_OPS;
 
 	redirector_cfg.prog_attach_type[0] = BPF_SK_MSG_VERDICT;
-	redirector_cfg.prog_attach_type[1] = BPF_CGROUP_SOCK_OPS;
+	//redirector_cfg.prog_attach_type[1] = BPF_CGROUP_SOCK_OPS;
 
 	/* get cgroup root descriptor */
 	int cgroup_root_fd;
@@ -195,6 +195,11 @@ int main(int argc, char*argv[])
 	printf("Loading bpf program redirector in kernel...\n");
 	struct bpf_object *bpf_obj = NULL;
 	bpf_obj = load_bpf_progs(&redirector_cfg);
+
+	printf("load_progs: success!!!\n");
+
+	if (1)
+		return 0;
 
 	/* récupérer les descripteurs des ebpf progs */
 	int i = 0;
