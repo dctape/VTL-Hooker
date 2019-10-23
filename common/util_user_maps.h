@@ -14,4 +14,6 @@ int open_bpf_map_file(const char *pin_dir,
 		      const char *mapname,
 		      struct bpf_map_info *info);
 
+int pin_maps_in_bpf_object(struct bpf_object *bpf_obj, const char *subdir);
+
 #endif /* __UTIL_USER_MAPS_H */

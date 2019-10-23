@@ -51,6 +51,7 @@
 //TODO : comprendre la signification de ces define
 #define RX_BATCH_SIZE      		64
 
+static bool global_exit;
 
 void DumpHex(const void* data, size_t size) {
 	char ascii[17];
@@ -96,17 +97,18 @@ static bool process_packet(struct xsk_socket_info *xsk,
 	
 	/* Extraction paquet ipv4 */
 	struct ethhdr *eth = (struct ethhdr *) pkt;
-	struct iphdr *iph = (struct iphdr *)(eth + ETH_HLEN);
+	struct iphdr *iph = (struct iphdr *)(eth + 1);
 
 	//printf("iph->protocol : %d\n", iph->protocol);
 	if(iph->protocol != IPPROTO_VTL){
-		printf("ip_proto does not correspond...waiting next packet\n");
+		// printf("iph->protocol : %d\n", iph->protocol);
+		// printf("ip_proto does not correspond...waiting next packet\n");
 		return false;
 	}
 	printf("iph->protocol : %d\n", iph->protocol);
 
 	__u8  iph_len = iph->ihl << 2;
-	struct vtlhdr *vtlh = (struct vtlhdr *)(eth + ETH_HLEN + iph_len);
+	struct vtlhdr *vtlh = (struct vtlhdr *)(iph + 1);
 	char *data = (char *)(vtlh + 1); // Est-ce la bonne manière de procéder ?
 
 	printf("vtl hdr -> checksum : %d\n", vtlh->checksum);
@@ -177,7 +179,7 @@ static void rx_and_process(struct xdp_config *cfg,
 	fds[0].fd = xsk_socket__fd(xsk_socket->xsk);
 	fds[0].events = POLLIN;
 
-	while(1){
+	while(!global_exit){
 		if (cfg->xsk_poll_mode){
 	
 			ret = poll(fds, nfds, -1);
@@ -189,6 +191,12 @@ static void rx_and_process(struct xdp_config *cfg,
 	}
 	
 
+}
+
+static void exit_application(int signal)
+{
+	signal = signal;
+	global_exit = true;
 }
 
 int main(int argc, char **argv)
@@ -219,6 +227,10 @@ int main(int argc, char **argv)
 	struct xsk_socket_info *xsk_socket;
 	struct bpf_object *bpf_obj = NULL;
 
+
+	/* Global shutdown handler */
+	signal(SIGINT, exit_application);
+
         if (cfg.ifindex == -1) {
 		fprintf(stderr, "ERROR: Required option --dev missing\n\n");
 		return EXIT_FAIL_OPTION;
@@ -228,7 +240,8 @@ int main(int argc, char **argv)
         	return EXIT_FAIL;
     
     	/* Chargement de programme XDP... */
-    	struct bpf_map *map;
+	//TODO: add cfg.do_unload...    
+	struct bpf_map *map;
 
     	bpf_obj = load_bpf_and_xdp_attach(&cfg);
 	if (!bpf_obj) {
@@ -293,6 +306,12 @@ int main(int argc, char **argv)
 	/* Receive and count packets than drop them */
 	rx_and_process(&cfg, xsk_socket);
 
-	return 0;
+
+	/* Cleanup */
+	xsk_socket__delete(xsk_socket->xsk);
+	xsk_umem__delete(umem->umem);
+	xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
+
+	return EXIT_OK;
 
 }

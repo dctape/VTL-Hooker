@@ -29,6 +29,7 @@ clean:
 
 
 #TODO: add common_libbpf.h ?
+#TODO: don't forget dependencies like defines.h
 # common_user_bpf_xdp.o: common_user_bpf_xdp.c common_libbpf.h common_user_bpf_xdp.h 	
 # 	$(CC) $(CFLAGS) -c -o $@ $< 
 #common_user_bpf_socket.o: common_user_bpf_socket.c common_libbpf.h common_user_bpf_socket.h

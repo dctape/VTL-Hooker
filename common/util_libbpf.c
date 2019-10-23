@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
@@ -15,7 +13,7 @@
 #include <linux/if_link.h> 
 #include <linux/err.h>
 
-// fusionner defines.h et params.h ?
+//TODO: fusionner defines.h et params.h ?
 #include "defines.h"
 #include "util_libbpf.h"
 

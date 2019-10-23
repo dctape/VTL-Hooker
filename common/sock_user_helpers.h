@@ -19,8 +19,8 @@ struct bpf_object *load_bpf_progs(struct sock_bpf_config *sk_cfg);
 
 // struct bpf_object *load_bpf_and_sockops_attach(struct config *cfg);
 
-int skmsg_detach (struct config *cfg, int skmsg_prog_fd);
+// int skmsg_detach (struct config *cfg, int skmsg_prog_fd);
 
-int sockops_detach(struct config *cfg, int sockops_prog_fd);
+// int sockops_detach(struct config *cfg, int sockops_prog_fd);
 
 #endif /*__SOCK_USER_HELPERS_H */

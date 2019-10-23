@@ -1,8 +1,8 @@
 
-#include <string.h>     /* strerror */
+#include <errno.h>
 #include <net/if.h>     /* IF_NAMESIZE */
 #include <stdlib.h>     /* exit(3) */
-#include <errno.h>
+#include <string.h>     /* strerror */
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h> /* bpf_get_link_xdp_id + bpf_set_link_xdp_id */
@@ -11,7 +11,6 @@
 #include <linux/err.h>
 
 #include "defines.h"
-//#include "common_libbpf.h"
 #include "util_user_maps.h"
 #include "xdp_user_helpers.h"
 

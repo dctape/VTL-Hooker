@@ -189,30 +189,30 @@ load_bpf_progs(struct sock_bpf_config *sk_cfg)
 // 	return bpf_obj;
 // }
 
-int skmsg_detach (struct config *cfg, int skmsg_prog_fd)
-{
-	int err;
+// int skmsg_detach (struct config *cfg, int skmsg_prog_fd)
+// {
+// 	int err;
 
-	err = bpf_prog_detach2(skmsg_prog_fd, cfg->sock_map_fd,
-				BPF_SK_MSG_VERDICT);
-	if (err) {
-		fprintf(stderr, "ERR: bpf_prog_detach skmsg failed\n");
-		exit(err);
-	}
+// 	err = bpf_prog_detach2(skmsg_prog_fd, cfg->sock_map_fd,
+// 				BPF_SK_MSG_VERDICT);
+// 	if (err) {
+// 		fprintf(stderr, "ERR: bpf_prog_detach skmsg failed\n");
+// 		exit(err);
+// 	}
 
-	return err;
-}
+// 	return err;
+// }
 
-int sockops_detach(struct config *cfg, int sockops_prog_fd)
-{
-	int err;
+// int sockops_detach(struct config *cfg, int sockops_prog_fd)
+// {
+// 	int err;
 
-	err = bpf_prog_detach2(sockops_prog_fd, cfg->cgroup_fd, 
-				BPF_CGROUP_SOCK_OPS);
-	if (err) {
-		fprintf(stderr, "ERR: bpf_prog_detach sockops failed\n");
-		exit(err);
-	}
+// 	err = bpf_prog_detach2(sockops_prog_fd, cfg->cgroup_fd, 
+// 				BPF_CGROUP_SOCK_OPS);
+// 	if (err) {
+// 		fprintf(stderr, "ERR: bpf_prog_detach sockops failed\n");
+// 		exit(err);
+// 	}
 
-	return err;
-}
+// 	return err;
+// }

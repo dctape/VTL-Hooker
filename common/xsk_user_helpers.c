@@ -10,14 +10,16 @@
 #include "defines.h"
 #include "xsk_user_helpers.h"
 
-static inline __u32 xsk_ring_prod__free(struct xsk_ring_prod *r)
+static inline __u32 
+xsk_ring_prod__free(struct xsk_ring_prod *r)
 {
 	r->cached_cons = *r->consumer + r->size;
 	return r->cached_cons - r->cached_prod;
 }
 
 
-struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size)
+struct xsk_umem_info *
+configure_xsk_umem(void *buffer, uint64_t size)
 {
 	struct xsk_umem_info *umem;
 	int ret;
@@ -37,7 +39,8 @@ struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size)
 	return umem;
 }
 
-uint64_t xsk_alloc_umem_frame(struct xsk_socket_info *xsk)
+uint64_t 
+xsk_alloc_umem_frame(struct xsk_socket_info *xsk)
 {
 	uint64_t frame;
 	if (xsk->umem_frame_free == 0)
@@ -48,19 +51,22 @@ uint64_t xsk_alloc_umem_frame(struct xsk_socket_info *xsk)
 	return frame;
 }
 
-void xsk_free_umem_frame(struct xsk_socket_info *xsk, uint64_t frame)
+void 
+xsk_free_umem_frame(struct xsk_socket_info *xsk, uint64_t frame)
 {
 	assert(xsk->umem_frame_free < NUM_FRAMES);
 
 	xsk->umem_frame_addr[xsk->umem_frame_free++] = frame;
 }
 
-uint64_t xsk_umem_free_frames(struct xsk_socket_info *xsk)
+uint64_t 
+xsk_umem_free_frames(struct xsk_socket_info *xsk)
 {
 	return xsk->umem_frame_free;
 }
 
-struct xsk_socket_info *xsk_configure_socket(struct xdp_config *xdp_cfg,
+struct xsk_socket_info *
+xsk_configure_socket(struct xdp_config *xdp_cfg,
 					     struct xsk_umem_info *umem)
 {
 	struct xsk_socket_config xsk_cfg;

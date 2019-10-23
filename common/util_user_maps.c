@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
@@ -117,7 +116,8 @@ open_bpf_map_file(const char *pin_dir,
 }
 
 /* Pinning maps under /sys/fs/bpf in subdir */
-int pin_maps_in_bpf_object(struct bpf_object *bpf_obj, const char *subdir)
+int 
+pin_maps_in_bpf_object(struct bpf_object *bpf_obj, const char *subdir)
 {
 	char map_filename[PATH_MAX]; // Warning: Variable non utilisée
 	char pin_dir[PATH_MAX];

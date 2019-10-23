@@ -40,8 +40,8 @@ define i32 @xdp_sock_prog(%struct.xdp_md* nocapture readonly) #0 section "xdp_so
   br i1 %16, label %33, label %17, !dbg !138
 
 ; <label>:17:                                     ; preds = %1
-  call void @llvm.dbg.value(metadata %struct.ethhdr* %13, metadata !108, metadata !DIExpression(DW_OP_plus_uconst, 196, DW_OP_stack_value)), !dbg !139
-  %18 = getelementptr inbounds %struct.ethhdr, %struct.ethhdr* %13, i64 15, i32 1, !dbg !140
+  call void @llvm.dbg.value(metadata %struct.ethhdr* %14, metadata !108, metadata !DIExpression()), !dbg !139
+  %18 = getelementptr inbounds %struct.ethhdr, %struct.ethhdr* %13, i64 2, i32 1, !dbg !140
   %19 = bitcast [6 x i8]* %18 to %struct.iphdr*, !dbg !140
   %20 = inttoptr i64 %12 to %struct.iphdr*, !dbg !142
   %21 = icmp ugt %struct.iphdr* %19, %20, !dbg !143
@@ -52,7 +52,7 @@ define i32 @xdp_sock_prog(%struct.xdp_md* nocapture readonly) #0 section "xdp_so
   call void @llvm.lifetime.start.p0i8(i64 18, i8* nonnull %23) #3, !dbg !145
   call void @llvm.dbg.declare(metadata [18 x i8]* %3, metadata !109, metadata !DIExpression()), !dbg !145
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* nonnull %23, i8* getelementptr inbounds ([18 x i8], [18 x i8]* @xdp_sock_prog.____fmt, i64 0, i64 0), i64 18, i32 1, i1 false), !dbg !145
-  %24 = getelementptr inbounds %struct.ethhdr, %struct.ethhdr* %13, i64 14, i32 1, i64 3, !dbg !145
+  %24 = getelementptr inbounds %struct.ethhdr, %struct.ethhdr* %13, i64 1, i32 1, i64 3, !dbg !145
   %25 = load i8, i8* %24, align 1, !dbg !145, !tbaa !146
   %26 = zext i8 %25 to i32, !dbg !145
   %27 = call i32 (i8*, i32, ...) inttoptr (i64 6 to i32 (i8*, i32, ...)*)(i8* nonnull %23, i32 18, i32 %26) #3, !dbg !145

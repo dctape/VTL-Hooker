@@ -5,21 +5,23 @@
 
 #define _GNU_SOURCE //for strdup
 
-#include <stdio.h>
 #include <ctype.h>
-#include <string.h>
-#include <stdbool.h>
-
-#include <sys/types.h>
-#include <net/if.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <mntent.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <net/if.h>
 
 #include "cgroup_helpers.h"
 
+
 /* retourne le chemin du cgroup root */
-char *find_cgroup_root(void)  // pas nécessaire
+char 
+*find_cgroup_root(void)  // pas nécessaire
 {
 	struct mntent *mnt;
 	FILE *f;
@@ -39,14 +41,16 @@ char *find_cgroup_root(void)  // pas nécessaire
 }
 
 /* récupère le descripteur du cgroup root   */
-int get_cgroup_root_fd(void)
+int 
+get_cgroup_root_fd(void)
 {   
     int cgfd;
     char *cgroup_root_path = find_cgroup_root();
     cgfd = open(cgroup_root_path, O_RDONLY);
 	if (cgfd < 0) {
+		// TODO: Améliorer le code d'erreur
 		log_err("Opening Cgroup");
-        return -1; // Revoir...
+        	return -1;
 	}
     return cgfd;
 }

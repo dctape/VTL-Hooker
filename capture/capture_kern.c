@@ -52,7 +52,7 @@ int xdp_sock_prog(struct xdp_md *ctx)
         if(eth + 1 > data_end)
             return XDP_DROP;
         
-        struct iphdr *iph = (struct iphdr *)(eth + ETH_HLEN);
+        struct iphdr *iph = (struct iphdr *)(eth + 1);
         if(iph + 1 > data_end)
             return XDP_DROP;
         
