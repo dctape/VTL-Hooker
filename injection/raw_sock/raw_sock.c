@@ -189,7 +189,7 @@ ip4_hdr_config(struct inject_config *cfg)
         cfg->iphdr.ip_tos = 0;
 
         /* Total length of datagram (16 bits): IP header + VTL header + VTL data */
-        cfg->iphdr.ip_len = htons (IP4_HDRLEN + VTL_HDRLEN + cfg->datalen);
+        cfg->iphdr.ip_len = htons (IP4_HDRLEN + sizeof(struct vtlhdr) + cfg->datalen);
 
         /* ID sequence number (16 bits): unused, since single datagram */
         cfg->iphdr.ip_id = htons (0);
@@ -249,10 +249,10 @@ ip4_pkt_assemble(struct inject_config *cfg)
         memcpy (cfg->packet, &cfg->iphdr, IP4_HDRLEN);
 
         /* Next part of packet is upper layer protocol header : VTL header */
-        memcpy ((cfg->packet + IP4_HDRLEN), &cfg->vtlh, VTL_HDRLEN);
+        memcpy ((cfg->packet + IP4_HDRLEN), &cfg->vtlh, sizeof(struct vtlhdr));
 
         /* Finally, add the VTL data = app payload */
-        memcpy (cfg->packet + IP4_HDRLEN + VTL_HDRLEN, 
+        memcpy (cfg->packet + IP4_HDRLEN + sizeof(struct vtlhdr), 
                 cfg->data, cfg->datalen);
 
 }
