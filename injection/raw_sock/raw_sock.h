@@ -10,6 +10,7 @@
 #include "../../lib/vtl_util.h"
 
 #define IP4_HDRLEN            20 // IPv4 header length
+#define DATASIZE              200 // ideal size ? 1024 ? 16k ?
 
 //TODO
 

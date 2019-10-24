@@ -17,7 +17,6 @@
 #include "../common/tc_user_helpers.h" 
 #include "../lib/vtl_util.h"
 
-#define DATASIZE        100
 
 #define INJECTION_KERN_FILENAME                 "injection_kern.o"
 #define DEV_NAME                                "ens33"
@@ -60,7 +59,8 @@ int main(int argc, char **argv)
 
         /* Allocate memory for various arrays */
         //or DATASIZE ?
-        inject_cfg.data = allocate_ustrmem (IP_MAXPACKET); // Pourquoi la taille est IP_MAXPACKET ?
+        // inject_cfg.data = allocate_ustrmem (IP_MAXPACKET); // Pourquoi la taille est IP_MAXPACKET ?
+        inject_cfg.data = allocate_ustrmem (DATASIZE);
         inject_cfg.packet = allocate_ustrmem (IP_MAXPACKET);
         inject_cfg.interface = allocate_strmem (40);
         inject_cfg.target = allocate_strmem (40);
@@ -68,11 +68,14 @@ int main(int argc, char **argv)
         inject_cfg.dst_ip = allocate_strmem (INET_ADDRSTRLEN);
         inject_cfg.ip_flags = allocate_intmem (4);
 
-        /* Build data block */
-        
-        // For now, send a string!
-        strcpy(inject_cfg.data, "TEST");
-        inject_cfg.datalen = strlen(inject_cfg.data ); //or sizeof ?
+        static FILE *test_file = NULL;
+
+        /* Configuration des informations d'adressage */
+        // Possible car j'envoie à les données à la même cible
+        // A adapter pour d'autres cas d'utilisation
+        strcpy (inject_cfg.interface, DEV_NAME);
+        strcpy (inject_cfg.src_ip, SRC_IP);
+        strcpy (inject_cfg.target, DST_IP); // TODO: use dst_ip later
 
         /* Build vtl header block */
 
@@ -80,58 +83,66 @@ int main(int argc, char **argv)
         inject_cfg.vtlh.checksum = 50;
 
 
-        strcpy (inject_cfg.interface, DEV_NAME);
-        strcpy (inject_cfg.src_ip, SRC_IP);
-        strcpy (inject_cfg.target, DST_IP); // TODO: use dst_ip later
+        /* Ouverture du fichier de test */
+        // Don't forget to test test_file
+        // TODO: close test_file
+        test_file = fopen("../files/lion.jpg", "r");
 
-        /* Configuration de l'en-tête IPv4 */
-        ip4_hdr_config(&inject_cfg);
-
-
-        /* Prepare packet */
-        ip4_pkt_assemble(&inject_cfg);
+        fread(inject_cfg.data, 1, DATASIZE , test_file);
         
+        /* Lecture du contenu puis formation du paquet */
+        while (!feof(test_file)) {
 
-        memset (&sin, 0, sizeof (struct sockaddr_in));
-        sin.sin_family = AF_INET;
-        sin.sin_addr.s_addr = inject_cfg.iphdr.ip_dst.s_addr;
+                /** Lecture des datas **/
+                fread(inject_cfg.data, 1, DATASIZE , test_file);
 
-        /* Submit request for a raw socket descriptor */
-        if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
-                perror ("socket() failed ");
-                exit (EXIT_FAILURE);
-        }
+                /** Formation du paquet IP **/
+                
+                /* 1- Configuration de l'en-tête IPv4  */
+                ip4_hdr_config(&inject_cfg);
 
-        /* Set flag so socket expects us to provide IPv4 header */
-        if (setsockopt (sd, IPPROTO_IP, IP_HDRINCL, &on, sizeof (on)) < 0) {
-                perror ("setsockopt() failed to set IP_HDRINCL ");
-                exit (EXIT_FAILURE);
-        }
+                /* 2- Préparer le paquet */
+                /* Prepare packet */
+                ip4_pkt_assemble(&inject_cfg);
 
-        /* Bind socket to interface index */
-        if (setsockopt (sd, SOL_SOCKET, SO_BINDTODEVICE, &inject_cfg.ifr, sizeof (inject_cfg.ifr)) < 0) {
-                perror ("setsockopt() failed to bind to interface ");
-                exit (EXIT_FAILURE);
-        }
+                memset (&sin, 0, sizeof (struct sockaddr_in));
+                sin.sin_family = AF_INET;
+                sin.sin_addr.s_addr = inject_cfg.iphdr.ip_dst.s_addr;
 
-        /* Send packet */
-        printf("Send data : %s 5 times\n", inject_cfg.data);
-        for (size_t i = 0; i < 5; i++)
-        {
-                if (sendto (sd, inject_cfg.packet, IP4_HDRLEN + sizeof(struct vtlhdr) + inject_cfg.datalen, 
-                        0, (struct sockaddr *) &sin, sizeof (struct sockaddr)) < 0)  {
-                perror ("sendto() failed ");
-                exit (EXIT_FAILURE);
+                /* Submit request for a raw socket descriptor */
+                if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
+                        perror ("socket() failed ");
+                        exit (EXIT_FAILURE);
+                }
+
+                /* Set flag so socket expects us to provide IPv4 header */
+                if (setsockopt (sd, IPPROTO_IP, IP_HDRINCL, &on, sizeof (on)) < 0) {
+                        perror ("setsockopt() failed to set IP_HDRINCL ");
+                        exit (EXIT_FAILURE);
+                }
+
+                /* Bind socket to interface index */
+                if (setsockopt (sd, SOL_SOCKET, SO_BINDTODEVICE, &inject_cfg.ifr, sizeof (inject_cfg.ifr)) < 0) {
+                        perror ("setsockopt() failed to bind to interface ");
+                        exit (EXIT_FAILURE);
+                }
+
+
+                /* Envoie des données */
+                /* Send packet */
+                printf("Send data\n");
+                
+                if (sendto (sd, inject_cfg.packet, IP4_HDRLEN + sizeof(struct vtlhdr) + DATASIZE, 
+                                0, (struct sockaddr *) &sin, sizeof (struct sockaddr)) < 0)  {
+                        perror ("sendto() failed ");
+                        exit (EXIT_FAILURE);
                 }       
+          
+                memset(inject_cfg.data, 0, DATASIZE);
+                
         }
 
-        // if (sendto (sd, inject_cfg.packet, IP4_HDRLEN + VTL_HDRLEN + inject_cfg.datalen, 
-        //                 0, (struct sockaddr *) &sin, sizeof (struct sockaddr)) < 0)  {
-        //         perror ("sendto() failed ");
-        //         exit (EXIT_FAILURE);
-        // }  
         
-
         /* Close socket descriptor */
         close (sd);
 
