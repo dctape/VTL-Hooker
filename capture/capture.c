@@ -82,6 +82,13 @@ void DumpHex(const void* data, size_t size) {
 	}
 }
 
+static void receive_string(char *data)
+{
+	printf("Received data: %s\n", data);
+	//DumpHex(data, sizeof(data));
+}
+
+
 /*
  * configure_xsk_umem() : Allocation et "création" du umem (userspace memory)
  * 
@@ -92,6 +99,8 @@ void DumpHex(const void* data, size_t size) {
 static bool process_packet(struct xsk_socket_info *xsk,
 			   uint64_t addr, uint32_t len)
 {	
+	//TODO: mettre une phrase de début
+	
 	/* Récupération des paquets "brut" */
 	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);
 	
@@ -99,21 +108,17 @@ static bool process_packet(struct xsk_socket_info *xsk,
 	struct ethhdr *eth = (struct ethhdr *) pkt;
 	struct iphdr *iph = (struct iphdr *)(eth + 1);
 
-	//printf("iph->protocol : %d\n", iph->protocol);
-	if(iph->protocol != IPPROTO_VTL){
-		// printf("iph->protocol : %d\n", iph->protocol);
-		// printf("ip_proto does not correspond...waiting next packet\n");
+	//TODO: le faire au niveau de XDP ?
+	if(iph->protocol != IPPROTO_VTL){		
 		return false;
 	}
 	printf("iph->protocol : %d\n", iph->protocol);
 
-	__u8  iph_len = iph->ihl << 2;
 	struct vtlhdr *vtlh = (struct vtlhdr *)(iph + 1);
 	char *data = (char *)(vtlh + 1); // Est-ce la bonne manière de procéder ?
 
 	printf("vtl hdr -> checksum : %d\n", vtlh->checksum);
-	DumpHex(data, sizeof(data));
-
+	receive_string(data);
 
 	return true;
 

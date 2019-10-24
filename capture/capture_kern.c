@@ -45,18 +45,18 @@ int xdp_sock_prog(struct xdp_md *ctx)
         /* A set entry here means that the correspnding queue_id
         * has an active AF_XDP socket bound to it. */
 
-        void *data = (void *)(long)ctx->data;
-        void *data_end = (void *)(long)ctx->data_end;
+        // void *data = (void *)(long)ctx->data;
+        // void *data_end = (void *)(long)ctx->data_end;
 
-        struct ethhdr *eth = (struct ethhdr *)data;
-        if(eth + 1 > data_end)
-            return XDP_DROP;
+        // struct ethhdr *eth = (struct ethhdr *)data;
+        // if(eth + 1 > data_end)
+        //     return XDP_DROP;
         
-        struct iphdr *iph = (struct iphdr *)(eth + 1);
-        if(iph + 1 > data_end)
-            return XDP_DROP;
+        // struct iphdr *iph = (struct iphdr *)(eth + 1);
+        // if(iph + 1 > data_end)
+        //     return XDP_DROP;
         
-        bpf_printk("ip protocol : %d\n", iph->protocol);
+        // bpf_printk("ip protocol : %d\n", iph->protocol);
 
         if (bpf_map_lookup_elem(&xsks_map, &index))
             return bpf_redirect_map(&xsks_map, index, 0);
