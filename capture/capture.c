@@ -223,7 +223,7 @@ static void rx_and_process(struct xdp_config *cfg,
 	
 			ret = poll(fds, nfds, -1);
 			if (ret <= 0 || ret > 1)
-				continue; // return ???
+				continue; 
 		}
 		
 		handle_receive_packets(xsk_socket);
@@ -241,7 +241,6 @@ static void exit_application(int signal)
 int main(int argc, char **argv)
 {
     	int ret;
-    	//char *ifname = "veth-adv03";
 	int xsks_map_fd;
 	void *packet_buffer;
 	uint64_t packet_buffer_size;
