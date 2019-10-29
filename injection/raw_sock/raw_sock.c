@@ -53,17 +53,17 @@ allocate_strmem (int len)
 {
         void *tmp;
         if (len <= 0) {
-        fprintf (stderr, "ERROR: Cannot allocate memory because len = %i in allocate_strmem().\n", len);
-        exit (EXIT_FAILURE);
+                fprintf (stderr, "ERROR: Cannot allocate memory because len = %i in allocate_strmem().\n", len);
+                exit (EXIT_FAILURE);
         }
 
         tmp = (char *) malloc (len * sizeof (char));
         if (tmp != NULL) {
-        memset (tmp, 0, len * sizeof (char));
-        return (tmp);
+                memset (tmp, 0, len * sizeof (char));
+                return (tmp);
         } else {
-        fprintf (stderr, "ERROR: Cannot allocate memory for array allocate_strmem().\n");
-        exit (EXIT_FAILURE);
+                fprintf (stderr, "ERROR: Cannot allocate memory for array allocate_strmem().\n");
+                exit (EXIT_FAILURE);
         }
 }
 
@@ -119,8 +119,99 @@ allocate_intmem (int len)
         return tmp;      
 }
 
+int
+create_raw_sock(void)
+{
+        int sock_fd;
+        
+        /* Submit request for a raw socket descriptor */
+        if ((sock_fd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
+                perror ("socket() failed ");
+                exit (EXIT_FAILURE);
+        }
+
+        return sock_fd;
+
+}
+
+/* Set flag so socket expects us to provide IPv4 header */
 int 
-ip4_hdr_config(struct inject_config *cfg)
+enable_ip4_hdr_gen(int sock_fd)
+{
+        const int on = 1;
+        if (setsockopt (sock_fd, IPPROTO_IP, IP_HDRINCL, &on, sizeof (on)) < 0) {
+                perror ("setsockopt() failed to set IP_HDRINCL ");
+                exit (EXIT_FAILURE);
+        }
+
+        return 0;
+}
+
+
+int
+bind_raw_sock_to_interface(char *interface, int sock_fd)
+{
+        int sd;
+        struct ifreq ifr;
+
+        /* Submit request for a socket descriptor to look up interface. */
+        if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
+                perror ("socket() failed to get socket descriptor for using ioctl() ");
+                exit (EXIT_FAILURE); //TODO: change exit() into return 
+        }
+
+        // TODO: Is it necessary ?
+        /* 
+         * Use ioctl() to look up interface index which we will use to
+         * bind socket descriptor sd to specified interface with setsockopt() since
+         * none of the other arguments of sendto() specify which interface to use.
+         */
+
+        memset (&ifr, 0, sizeof (ifr));
+        snprintf (ifr.ifr_name, sizeof (ifr.ifr_name), "%s", interface);
+        if (ioctl (sd, SIOCGIFINDEX, &ifr) < 0) {
+                perror ("ioctl() failed to find interface ");
+                return (EXIT_FAILURE);
+        }
+        close (sd); //Pourquoi ?
+        printf ("Index for interface %s is %i\n", 
+                        interface, ifr.ifr_ifindex); // Pourquoi ? Est-ce nécessaire ?
+
+        /* Bind socket to interface index */
+        //TODO : use bind  ?
+        if (setsockopt (sock_fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof (ifr)) < 0) {
+                perror ("setsockopt() failed to bind to interface ");
+                exit (EXIT_FAILURE);
+        }
+
+        return 0;   
+
+}
+
+void
+fill_sockaddr_in(struct sockaddr_in *to, struct inject_config *inject_cfg)
+{
+      memset (to, 0, sizeof (struct sockaddr_in));
+      to->sin_family = AF_INET;
+      to->sin_addr.s_addr = inject_cfg->iphdr.ip_dst.s_addr; 
+}
+
+
+int
+send_packet(int sock_fd, struct inject_config *inject_cfg , struct sockaddr_in *to)
+{
+
+        if (sendto (sock_fd, inject_cfg->packet, IP4_HDRLEN + sizeof(struct vtlhdr) + inject_cfg->datalen, 
+                                0, (struct sockaddr *) to, sizeof (struct sockaddr)) < 0)  {
+                        perror ("sendto() failed ");
+                        exit (EXIT_FAILURE);
+        }
+
+        return 0;
+}
+
+int 
+create_ip4_hdr(struct inject_config *cfg)
 {       
 
         int sd, status; 
@@ -128,29 +219,7 @@ ip4_hdr_config(struct inject_config *cfg)
 
         struct addrinfo hints, *res;
         struct sockaddr_in *ipv4;
-          
-        /* Submit request for a socket descriptor to look up interface. */
-        if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
-                perror ("socket() failed to get socket descriptor for using ioctl() ");
-                exit (EXIT_FAILURE); //TODO: change exit() into return 
-        }
-
-        /* 
-         * Use ioctl() to look up interface index which we will use to
-         * bind socket descriptor sd to specified interface with setsockopt() since
-         * none of the other arguments of sendto() specify which interface to use.
-         */
-
-        memset (&cfg->ifr, 0, sizeof (cfg->ifr));
-        snprintf (cfg->ifr.ifr_name, sizeof (cfg->ifr.ifr_name), "%s", cfg->interface);
-        if (ioctl (sd, SIOCGIFINDEX, &cfg->ifr) < 0) {
-                perror ("ioctl() failed to find interface ");
-                return (EXIT_FAILURE);
-        }
-        close (sd); //Pourquoi ?
-        printf ("Index for interface %s is %i\n", 
-                        cfg->interface, cfg->ifr.ifr_ifindex); // Pourquoi ? Est-ce nécessaire ?
-       
+             
         // Pour l'instant, pas très important
         // TODO: revoir cette partie...
         /* Fill out hints for getaddrinfo(). */
@@ -189,7 +258,7 @@ ip4_hdr_config(struct inject_config *cfg)
         cfg->iphdr.ip_tos = 0;
 
         /* Total length of datagram (16 bits): IP header + VTL header + VTL data */
-        cfg->iphdr.ip_len = htons (IP4_HDRLEN + sizeof(struct vtlhdr) + DATASIZE);
+        cfg->iphdr.ip_len = htons (IP4_HDRLEN + sizeof(struct vtlhdr) + cfg->datalen);
 
         /* ID sequence number (16 bits): unused, since single datagram */
         cfg->iphdr.ip_id = htons (0);
@@ -253,6 +322,6 @@ ip4_pkt_assemble(struct inject_config *cfg)
 
         /* Finally, add the VTL data = app payload */
         memcpy (cfg->packet + IP4_HDRLEN + sizeof(struct vtlhdr), 
-                cfg->data, DATASIZE);
+                cfg->data, cfg->datalen);
 
 }

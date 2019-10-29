@@ -6,12 +6,12 @@
 #include <string.h>           // strcpy, memset(), and memcpy()
 #include <unistd.h>           // close()
 
-#include <netinet/in.h>       // IPPROTO_RAW, IPPROTO_IP, IPPROTO_ICMP, INET_ADDRSTRLEN
-#include <netinet/ip.h>       // struct ip and IP_MAXPACKET (which is 65535)
+#include <netinet/in.h>       // IPPROTO_RAW, IPPROTO_IP,  INET_ADDRSTRLEN
+#include <netinet/ip.h>       // IP_MAXPACKET (which is 65535)
 #include <sys/types.h>        // needed for socket(), uint8_t, uint16_t, uint32_t
 #include <sys/socket.h>       // needed for socket()
 
-#include <bpf/bpf.h> // or <bpf/bpf.h> ?
+#include <bpf/bpf.h> 
 
 #include "./raw_sock/raw_sock.h"
 #include "../common/tc_user_helpers.h" 
@@ -29,11 +29,14 @@
 int main(int argc, char **argv)
 {   
 
-        int sd;
-        int ifindex;      
-        const int on = 1;
+        int sock_fd;
+        int ifindex;
+        int cnt_pkt = 0;
+        int cnt_bytes = 0;
 
-        struct sockaddr_in sin;
+        FILE *tx_file = NULL;
+      
+        struct sockaddr_in to;
         struct inject_config inject_cfg = {};
         struct tc_config tc_cfg = {
                 .filename = INJECTION_KERN_FILENAME,
@@ -58,9 +61,7 @@ int main(int argc, char **argv)
         }
 
         /* Allocate memory for various arrays */
-        //or DATASIZE ?
-        // inject_cfg.data = allocate_ustrmem (IP_MAXPACKET); // Pourquoi la taille est IP_MAXPACKET ?
-        inject_cfg.data = allocate_ustrmem (DATASIZE);
+        inject_cfg.data = allocate_ustrmem (DATASIZE); //TODO: DATASIZE or IP_MAXPACKET
         inject_cfg.packet = allocate_ustrmem (IP_MAXPACKET);
         inject_cfg.interface = allocate_strmem (40);
         inject_cfg.target = allocate_strmem (40);
@@ -68,8 +69,7 @@ int main(int argc, char **argv)
         inject_cfg.dst_ip = allocate_strmem (INET_ADDRSTRLEN);
         inject_cfg.ip_flags = allocate_intmem (4);
 
-        static FILE *test_file = NULL;
-
+        
         /* Configuration des informations d'adressage */
         // Possible car j'envoie à les données à la même cible
         // A adapter pour d'autres cas d'utilisation
@@ -77,74 +77,64 @@ int main(int argc, char **argv)
         strcpy (inject_cfg.src_ip, SRC_IP);
         strcpy (inject_cfg.target, DST_IP); // TODO: use dst_ip later
 
-        /* Build vtl header block */
-
-        // Just for test
-        inject_cfg.vtlh.checksum = 50;
+        /* Config vtl header */   
+        inject_cfg.vtlh.checksum = 50; // Just for test
 
 
         /* Ouverture du fichier de test */
-        // Don't forget to test test_file
         // TODO: close test_file
-        test_file = fopen("../files/lion.jpg", "r");
-
-        fread(inject_cfg.data, 1, DATASIZE , test_file);
-        
-        /* Lecture du contenu puis formation du paquet */
-        while (!feof(test_file)) {
-
-                /** Lecture des datas **/
-                fread(inject_cfg.data, 1, DATASIZE , test_file);
-
-                /** Formation du paquet IP **/
-                
-                /* 1- Configuration de l'en-tête IPv4  */
-                ip4_hdr_config(&inject_cfg);
-
-                /* 2- Préparer le paquet */
-                /* Prepare packet */
-                ip4_pkt_assemble(&inject_cfg);
-
-                memset (&sin, 0, sizeof (struct sockaddr_in));
-                sin.sin_family = AF_INET;
-                sin.sin_addr.s_addr = inject_cfg.iphdr.ip_dst.s_addr;
-
-                /* Submit request for a raw socket descriptor */
-                if ((sd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
-                        perror ("socket() failed ");
-                        exit (EXIT_FAILURE);
-                }
-
-                /* Set flag so socket expects us to provide IPv4 header */
-                if (setsockopt (sd, IPPROTO_IP, IP_HDRINCL, &on, sizeof (on)) < 0) {
-                        perror ("setsockopt() failed to set IP_HDRINCL ");
-                        exit (EXIT_FAILURE);
-                }
-
-                /* Bind socket to interface index */
-                if (setsockopt (sd, SOL_SOCKET, SO_BINDTODEVICE, &inject_cfg.ifr, sizeof (inject_cfg.ifr)) < 0) {
-                        perror ("setsockopt() failed to bind to interface ");
-                        exit (EXIT_FAILURE);
-                }
-
-
-                /* Envoie des données */
-                /* Send packet */
-                printf("Send data\n");
-                
-                if (sendto (sd, inject_cfg.packet, IP4_HDRLEN + sizeof(struct vtlhdr) + DATASIZE, 
-                                0, (struct sockaddr *) &sin, sizeof (struct sockaddr)) < 0)  {
-                        perror ("sendto() failed ");
-                        exit (EXIT_FAILURE);
-                }       
-          
-                memset(inject_cfg.data, 0, DATASIZE);
-                
+        tx_file = fopen("../files/lion.jpg", "rb"); // or ../files/file.txt
+        if (tx_file == NULL){
+                fprintf(stderr, "ERR: failed to open test file\n");
+                exit(EXIT_FAILURE);
         }
 
+
+        /* Création d'une socket brut */
+        sock_fd = create_raw_sock();
+
+        /* activer la génération d'en-tête ip4 */
+        enable_ip4_hdr_gen(sock_fd);
+
+        /* Attacher une interface à la raw socket */
+        bind_raw_sock_to_interface(inject_cfg.interface, sock_fd);
+
+
+        /* Lecture du contenu puis formation du paquet */
+        printf("\n");
+        printf("Sending data...");
+
+        while (!feof(tx_file)) {
+
+                inject_cfg.datalen = fread(inject_cfg.data, 1, DATASIZE, tx_file);
+
+                create_ip4_hdr(&inject_cfg); //or ip4_hdr_config(&inject_cfg)
+
+                /* fill destination sock_addr_in */
+                fill_sockaddr_in(&to, &inject_cfg);
+
+                ip4_pkt_assemble(&inject_cfg);
+
+                send_packet(sock_fd, &inject_cfg, &to);            
+                
+                memset(inject_cfg.data, 0, inject_cfg.datalen);
+                cnt_pkt++;
+                cnt_bytes += inject_cfg.datalen;
+                
+        }
+        printf("Done\n");
+        printf("\n");
+
+        printf("Nbrs of sent packets: %d pkts\n", cnt_pkt);
+        printf("Nbrs of sent bytes: %d bytes\n", cnt_bytes);
+        printf("\n");
+
         
+        /* Close test file  */
+        fclose(tx_file);
+
         /* Close socket descriptor */
-        close (sd);
+        close (sock_fd);
 
 
         /* Free allocated memory */
