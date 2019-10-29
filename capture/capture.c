@@ -42,7 +42,7 @@
 #include "../common/tc_user_helpers.h"
 #include "../common/xsk_user_helpers.h"
 
-
+#define DATASIZE              200
 
 #define XDP_FILENAME       		"capture_kern.o"
 #define NIC_NAME		   	"ens33"
@@ -88,6 +88,43 @@ static void receive_string(char *data)
 	//DumpHex(data, sizeof(data));
 }
 
+static void recv_txt_file(char *data)
+{
+	/* Ouvrir le fichier de réception */
+	//fopen
+	static FILE *rx_file = NULL;
+	
+	//TODO: test rx_file
+	//TODO: close rx_file
+	rx_file = fopen("file.txt", "a");
+
+	fwrite(data, 1, DATASIZE, rx_file);
+	fflush(rx_file);
+
+	fclose(rx_file);
+	
+	/* écrire à la fin du fichier */
+
+}
+
+static void recv_image_file(char *data)
+{
+	/* Ouvrir le fichier de réception */
+	//fopen
+	static FILE *rx_file = NULL;
+	
+	//TODO: test rx_file
+	//TODO: close rx_file
+	rx_file = fopen("lion.jpg", "a");
+
+	fwrite(data, 1, DATASIZE, rx_file);
+	fflush(rx_file);
+
+	fclose(rx_file);
+	
+	/* écrire à la fin du fichier */
+
+}
 
 /*
  * configure_xsk_umem() : Allocation et "création" du umem (userspace memory)
@@ -100,7 +137,7 @@ static bool process_packet(struct xsk_socket_info *xsk,
 			   uint64_t addr, uint32_t len)
 {	
 	//TODO: mettre une phrase de début
-	
+
 	/* Récupération des paquets "brut" */
 	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);
 	
@@ -117,8 +154,12 @@ static bool process_packet(struct xsk_socket_info *xsk,
 	struct vtlhdr *vtlh = (struct vtlhdr *)(iph + 1);
 	char *data = (char *)(vtlh + 1); // Est-ce la bonne manière de procéder ?
 
-	printf("vtl hdr -> checksum : %d\n", vtlh->checksum);
-	receive_string(data);
+	//recv_txt_file(data); Essayer de ne pas convertir en char 
+
+	recv_image_file(data);
+
+	// printf("vtl hdr -> checksum : %d\n", vtlh->checksum);
+	// receive_string(data);
 
 	return true;
 
