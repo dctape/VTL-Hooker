@@ -9,10 +9,12 @@
 #include "bpf_helpers.h"
 #include "tc_bpf_util.h"
 
+#include "../lib/vtl_util.h"
 
-#define IPPROTO_VTL             253
-#define MAX_IP_HDR_LEN          60
-#define BPF_ADJ_ROOM_NET        0
+
+// #define IPPROTO_VTL             253
+// #define MAX_IP_HDR_LEN          60
+// #define BPF_ADJ_ROOM_NET        0
 
 
 #define bpf_debug_printk(fmt, ...)                                      \
@@ -25,11 +27,7 @@
 
 
 
-struct vtlhdr {
 
-	int ctrl_sum;
-	//int seq_num;
-};
 
 
 
@@ -126,7 +124,28 @@ int _tf_tc_egress(struct __sk_buff *skb)
         // unsigned long offset = sizeof(struct ethhdr) + (unsigned long)iph_len;
         // ret = bpf_skb_store_bytes(skb, (int)offset, &vtlh, sizeof(struct vtlhdr),
         //                                 BPF_F_RECOMPUTE_CSUM); 
+	
+	void *data = (void *)(long)skb->data;
+        void *data_end = (void *)(long)skb->data_end;
 
+	struct ethhdr *eth = (struct ethhdr *)data;
+        if(eth + 1 > data_end)
+        	return TC_ACT_OK;
+        
+        struct iphdr *iph = (struct iphdr *)(eth + 1);
+        if(iph + 1 > data_end)
+             return TC_ACT_OK;
+	
+	if(iph->protocol != IPPROTO_VTL)
+	         return TC_ACT_OK;
+	
+	//TODO: Modify with bpf_skb_store_bytes ?
+	struct vtlhdr *vtlh = (struct vtlhdr *)(iph + 1);
+	if(vtlh + 1 > data_end)
+             return TC_ACT_OK;
+
+	vtlh->checksum = 30;
+	
         return TC_ACT_OK;
 }
 
