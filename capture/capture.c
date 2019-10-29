@@ -54,6 +54,7 @@ static bool global_exit;
 static int cnt_pkt;
 static int cnt_bytes;
 
+
 void DumpHex(const void* data, size_t size) {
 	char ascii[17];
 	size_t i, j;
@@ -132,7 +133,7 @@ static bool process_packet(struct xsk_socket_info *xsk,
 {	
 	int hdr_size;
 	int data_size;
-	
+
 	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);
 	
 	struct ethhdr *eth = (struct ethhdr *) pkt;
@@ -147,7 +148,8 @@ static bool process_packet(struct xsk_socket_info *xsk,
 
 	cnt_pkt++;
 	cnt_bytes += data_size;
-	printf("Recv pkt: %d   Recv bytes: %d\r", cnt_pkt, cnt_bytes);
+	printf("vtl->checksum: %d  Recv pkt: %d   Recv bytes: %d\r", 
+		vtlh->checksum,cnt_pkt, cnt_bytes);
 	fflush(stdout);
 	
 	return true;

@@ -2,8 +2,8 @@
 #ifndef __VTL_UTIL_H
 #define __VTL_UTIL_H
 
-#include <sys/types.h>        // needed for socket(), uint8_t, uint16_t, uint32_t
 
+#include <stdint.h>
 
 #define IPPROTO_VTL           200 //Nombre arbitraire...
 #define VTL_HDRLEN            20 //Nombre arbitraire....
