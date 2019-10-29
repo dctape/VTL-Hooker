@@ -1,6 +1,6 @@
 
 KERN_TARGETS  := injection_kern
-USER_TARGETS := injection
+USER_TARGETS := injection #TODO: rename it to injection_user ?
 
 LIBBPF_DIR = ../libbpf/src/
 COMMON_DIR = ../common/
@@ -16,6 +16,3 @@ include $(COMMON_DIR)/common.mk
 
 RAW_SOCK_OBJ = $(RAW_SOCK_DIR)/raw_sock.o
 USER_DEPS := $(RAW_SOCK_OBJ)
-
-# CFLAGS += $(libnet-config --defines)
-# LIBS += -lnet

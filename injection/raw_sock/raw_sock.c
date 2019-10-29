@@ -53,7 +53,7 @@ allocate_strmem (int len)
 {
         void *tmp;
         if (len <= 0) {
-                fprintf (stderr, "ERROR: Cannot allocate memory because len = %i in allocate_strmem().\n", len);
+                fprintf (stderr, "ERR: Cannot allocate memory because len = %i in allocate_strmem().\n", len);
                 exit (EXIT_FAILURE);
         }
 
@@ -62,7 +62,7 @@ allocate_strmem (int len)
                 memset (tmp, 0, len * sizeof (char));
                 return (tmp);
         } else {
-                fprintf (stderr, "ERROR: Cannot allocate memory for array allocate_strmem().\n");
+                fprintf (stderr, "ERR: Cannot allocate memory for array allocate_strmem().\n");
                 exit (EXIT_FAILURE);
         }
 }
@@ -126,7 +126,7 @@ create_raw_sock(void)
         
         /* Submit request for a raw socket descriptor */
         if ((sock_fd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
-                perror ("socket() failed ");
+                perror ("ERR: socket() failed ");
                 exit (EXIT_FAILURE);
         }
 
@@ -140,7 +140,7 @@ enable_ip4_hdr_gen(int sock_fd)
 {
         const int on = 1;
         if (setsockopt (sock_fd, IPPROTO_IP, IP_HDRINCL, &on, sizeof (on)) < 0) {
-                perror ("setsockopt() failed to set IP_HDRINCL ");
+                perror ("ERR: setsockopt() failed to set IP_HDRINCL ");
                 exit (EXIT_FAILURE);
         }
 
@@ -203,7 +203,7 @@ send_packet(int sock_fd, struct inject_config *inject_cfg , struct sockaddr_in *
 
         if (sendto (sock_fd, inject_cfg->packet, IP4_HDRLEN + sizeof(struct vtlhdr) + inject_cfg->datalen, 
                                 0, (struct sockaddr *) to, sizeof (struct sockaddr)) < 0)  {
-                        perror ("sendto() failed ");
+                        perror ("ERR: sendto() failed ");
                         exit (EXIT_FAILURE);
         }
 
@@ -214,7 +214,7 @@ int
 create_ip4_hdr(struct inject_config *cfg)
 {       
 
-        int sd, status; 
+        int status; 
         void *tmp;
 
         struct addrinfo hints, *res;
@@ -230,7 +230,7 @@ create_ip4_hdr(struct inject_config *cfg)
 
         /* Resolve target using getaddrinfo(). */
         if ((status = getaddrinfo (cfg->target, NULL, &hints, &res)) != 0) {
-                fprintf (stderr, "getaddrinfo() failed: %s\n", gai_strerror (status));
+                fprintf (stderr, "ERR: getaddrinfo() failed: %s\n", gai_strerror (status));
                 exit (EXIT_FAILURE);
         }
         
@@ -240,7 +240,7 @@ create_ip4_hdr(struct inject_config *cfg)
         if (inet_ntop (AF_INET, tmp, cfg->dst_ip, INET_ADDRSTRLEN) == NULL) {
                 status = errno;
                 fprintf (stderr, 
-                         "inet_ntop() failed.\nError message: %s", 
+                         "ERR: inet_ntop() failed.\nError message: %s", 
                         strerror (status));
                 exit (EXIT_FAILURE);
         }
@@ -286,23 +286,22 @@ create_ip4_hdr(struct inject_config *cfg)
         cfg->iphdr.ip_ttl = 255;
 
 
-        // Transport layer protocol (8 bits): 200 for VTL
-        // TODO: remplacer avec IPPROTO_VTL
+        /* Transport layer protocol (8 bits) */
         cfg->iphdr.ip_p = IPPROTO_VTL;
 
-        // Source IPv4 address (32 bits)
+        /* Source IPv4 address (32 bits) */
         if ((status = inet_pton (AF_INET, cfg->src_ip, &(cfg->iphdr.ip_src))) != 1) {
                 fprintf (stderr, "inet_pton() failed.\nError message: %s", strerror (status));
                 exit (EXIT_FAILURE);
         }
 
-        // Destination IPv4 address (32 bits)
+        /* Destination IPv4 address (32 bits) */
         if ((status = inet_pton (AF_INET, cfg->dst_ip, &(cfg->iphdr.ip_dst))) != 1) {
                 fprintf (stderr, "inet_pton() failed.\nError message: %s", strerror (status));
                 exit (EXIT_FAILURE);
         }
 
-        // IPv4 header checksum (16 bits): set to 0 when calculating checksum
+        /* IPv4 header checksum (16 bits): set to 0 when calculating checksum */
         cfg->iphdr.ip_sum = 0;
         cfg->iphdr.ip_sum = checksum ((uint16_t *) &cfg->iphdr, IP4_HDRLEN);
 

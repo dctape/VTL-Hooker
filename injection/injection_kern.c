@@ -12,7 +12,6 @@
 #include "../lib/vtl_util.h"
 
 
-// #define IPPROTO_VTL             253
 // #define MAX_IP_HDR_LEN          60
 // #define BPF_ADJ_ROOM_NET        0
 
