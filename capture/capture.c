@@ -42,7 +42,6 @@
 #include "../common/tc_user_helpers.h"
 #include "../common/xsk_user_helpers.h"
 
-#define DATASIZE              200
 
 #define XDP_FILENAME       		"capture_kern.o"
 #define NIC_NAME		   	"ens33"
@@ -52,6 +51,8 @@
 #define RX_BATCH_SIZE      		64
 
 static bool global_exit;
+static int cnt_pkt;
+static int cnt_bytes;
 
 void DumpHex(const void* data, size_t size) {
 	char ascii[17];
@@ -82,47 +83,40 @@ void DumpHex(const void* data, size_t size) {
 	}
 }
 
-static void receive_string(char *data)
-{
-	printf("Received data: %s\n", data);
-	//DumpHex(data, sizeof(data));
-}
 
-static void recv_txt_file(char *data)
+static void recv_txt_file(uint8_t *data, int size)
 {
-	/* Ouvrir le fichier de réception */
-	//fopen
+
 	static FILE *rx_file = NULL;
 	
-	//TODO: test rx_file
-	//TODO: close rx_file
-	rx_file = fopen("file.txt", "a");
+	rx_file = fopen("file.txt", "ab");
+	if (rx_file == NULL) {
+		fprintf(stderr, "ERR: failed to open test file\n");
+                exit(EXIT_FAILURE);
+	}
 
-	fwrite(data, 1, DATASIZE, rx_file);
+	fwrite(data, 1, size, rx_file);
 	fflush(rx_file);
 
 	fclose(rx_file);
-	
-	/* écrire à la fin du fichier */
 
 }
 
-static void recv_image_file(char *data)
+static void recv_image_file(uint8_t *data, int size)
 {
-	/* Ouvrir le fichier de réception */
-	//fopen
+
 	static FILE *rx_file = NULL;
 	
-	//TODO: test rx_file
-	//TODO: close rx_file
-	rx_file = fopen("lion.jpg", "a");
+	rx_file = fopen("lion.jpg", "ab");
+	if (rx_file == NULL) {
+		fprintf(stderr, "ERR: failed to open test file\n");
+                exit(EXIT_FAILURE);
+	}
 
-	fwrite(data, 1, DATASIZE, rx_file);
+	fwrite(data, 1, size, rx_file);
 	fflush(rx_file);
 
 	fclose(rx_file);
-	
-	/* écrire à la fin du fichier */
 
 }
 
@@ -136,33 +130,27 @@ static void recv_image_file(char *data)
 static bool process_packet(struct xsk_socket_info *xsk,
 			   uint64_t addr, uint32_t len)
 {	
-	//TODO: mettre une phrase de début
-
-	/* Récupération des paquets "brut" */
+	int hdr_size;
+	int data_size;
+	
 	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);
 	
-	/* Extraction paquet ipv4 */
 	struct ethhdr *eth = (struct ethhdr *) pkt;
 	struct iphdr *iph = (struct iphdr *)(eth + 1);
-
-	//TODO: le faire au niveau de XDP ?
-	if(iph->protocol != IPPROTO_VTL){		
-		return false;
-	}
-	printf("iph->protocol : %d\n", iph->protocol);
-
 	struct vtlhdr *vtlh = (struct vtlhdr *)(iph + 1);
-	char *data = (char *)(vtlh + 1); // Est-ce la bonne manière de procéder ?
+	uint8_t *data = (uint8_t*)(vtlh + 1); 
 
-	//recv_txt_file(data); Essayer de ne pas convertir en char 
+	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct vtlhdr);
+	data_size = len - hdr_size;	
+	
+	recv_image_file(data, data_size);
 
-	recv_image_file(data);
-
-	// printf("vtl hdr -> checksum : %d\n", vtlh->checksum);
-	// receive_string(data);
-
+	cnt_pkt++;
+	cnt_bytes += data_size;
+	printf("Recv pkt: %d   Recv bytes: %d\r", cnt_pkt, cnt_bytes);
+	fflush(stdout);
+	
 	return true;
-
 }
 
 static void handle_receive_packets(struct xsk_socket_info *xsk)
@@ -225,6 +213,9 @@ static void rx_and_process(struct xdp_config *cfg,
 	fds[0].fd = xsk_socket__fd(xsk_socket->xsk);
 	fds[0].events = POLLIN;
 
+	cnt_pkt = 0;
+	cnt_bytes = 0;
+	printf("Start capture\n");
 	while(!global_exit){
 		if (cfg->xsk_poll_mode){
 	
@@ -236,7 +227,7 @@ static void rx_and_process(struct xdp_config *cfg,
 		handle_receive_packets(xsk_socket);
 	}
 	
-
+	printf("End capture\n");
 }
 
 static void exit_application(int signal)
@@ -350,8 +341,9 @@ int main(int argc, char **argv)
     	//Pas trop besoin pour le moment...
 
 	/* Receive and count packets than drop them */
+	
 	rx_and_process(&cfg, xsk_socket);
-
+	
 
 	/* Cleanup */
 	xsk_socket__delete(xsk_socket->xsk);

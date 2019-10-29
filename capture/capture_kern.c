@@ -6,6 +6,8 @@
 #include <linux/bpf.h>
 #include "bpf_helpers.h"
 
+#include "../lib/vtl_util.h"
+
 struct bpf_map_def SEC("maps") xsks_map = {
 	.type = BPF_MAP_TYPE_XSKMAP,
 	.key_size = sizeof(int),
@@ -31,7 +33,7 @@ struct bpf_map_def SEC("maps") xsks_map = {
 SEC("xdp_sock")
 int xdp_sock_prog(struct xdp_md *ctx)
 {
-        int index = ctx->rx_queue_index;
+        
         //__u32 *pkt_count;
 
         /* pkt_count = bpf_map_lookup_elem(&xdp_stats_map, &index);
@@ -57,6 +59,23 @@ int xdp_sock_prog(struct xdp_md *ctx)
         //     return XDP_DROP;
         
         // bpf_printk("ip protocol : %d\n", iph->protocol);
+
+        int index = ctx->rx_queue_index;
+
+        void *data = (void *)(long)ctx->data;
+        void *data_end = (void *)(long)ctx->data_end;
+
+        struct ethhdr *eth = (struct ethhdr *)data;
+        if(eth + 1 > data_end)
+        	return XDP_DROP;
+        
+        struct iphdr *iph = (struct iphdr *)(eth + 1);
+        if(iph + 1 > data_end)
+             return XDP_DROP;
+
+        if(iph->protocol != IPPROTO_VTL) {		
+		return XDP_PASS;
+	    }
 
         if (bpf_map_lookup_elem(&xsks_map, &index))
             return bpf_redirect_map(&xsks_map, index, 0);
