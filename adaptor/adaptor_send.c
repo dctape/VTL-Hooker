@@ -11,113 +11,10 @@
 #include <string.h>           // strcpy, memset(), and memcpy()
 #include <errno.h>            // errno, perror()
 
-#include "adaptor-send.h"
+#include "adaptor_send.h"
 
 
-// Computing the internet checksum (RFC 1071).
-static uint16_t
-checksum (uint16_t *addr, int len)
-{
-        int count = len;
-        register uint32_t sum = 0;
-        uint16_t answer = 0;
 
-        // Sum up 2-byte values until none or only one byte left.
-        while (count > 1) {
-                sum += *(addr++);
-                count -= 2;
-        }
-
-        // Add left-over byte, if any.
-        if (count > 0) {
-              sum += *(uint8_t *) addr;  
-        }
-
-        // Fold 32-bit sum into 16 bits; we lose information by doing this,
-        // increasing the chances of a collision.
-        // sum = (lower 16 bits) + (upper 16 bits shifted right 16 bits)
-        while (sum >> 16) {
-        sum = (sum & 0xffff) + (sum >> 16);
-        }
-
-        // Checksum is one's compliment of sum.
-        answer = ~sum;
-
-        return (answer);
-}
-
-
-// Allocate memory for an array of chars.
-char *
-allocate_strmem (int len)
-{
-        void *tmp;
-        if (len <= 0) {
-                fprintf (stderr, "ERR: Cannot allocate memory because len = %i in allocate_strmem().\n", len);
-                exit (EXIT_FAILURE);
-        }
-
-        tmp = (char *) malloc (len * sizeof (char));
-        if (tmp != NULL) {
-                memset (tmp, 0, len * sizeof (char));
-                return (tmp);
-        } else {
-                fprintf (stderr, "ERR: Cannot allocate memory for array allocate_strmem().\n");
-                exit (EXIT_FAILURE);
-        }
-}
-
-
-// Allocate memory for an array of unsigned chars.
-uint8_t *
-allocate_ustrmem (int len)
-{
-        void *tmp;
-
-        if (len <= 0) {
-                fprintf (stderr, 
-                        "ERR: Cannot allocate memory because len = %i in allocate_ustrmem().\n", 
-                        len);
-                exit (EXIT_FAILURE);
-        }
-
-        tmp = (uint8_t *) malloc (len * sizeof (uint8_t));
-
-        if (tmp == NULL) {
-                fprintf (stderr, 
-                        "ERR: Cannot allocate memory for array allocate_ustrmem().\n");
-                exit (EXIT_FAILURE);
-        }
-        memset (tmp, 0, len * sizeof (uint8_t));
-        
-        return tmp;     
-}
-
-
-// Allocate memory for an array of ints.
-int *
-allocate_intmem (int len)
-{
-        void *tmp;
-
-        if (len <= 0) {
-                fprintf (stderr, 
-                         "ERR: Cannot allocate memory because len = %i in allocate_intmem().\n", 
-                        len);
-                exit (EXIT_FAILURE);
-        }
-
-        tmp = (int *) malloc (len * sizeof (int));
-
-        if (tmp == NULL) {
-                fprintf (stderr, 
-                         "ERR: Cannot allocate memory for array allocate_intmem().\n");
-                exit (EXIT_FAILURE);
-        } 
-
-        memset (tmp, 0, len * sizeof (int));
-        return tmp;      
-}
 
 int
 adaptor_create_raw_sock(int domain, int protocol)
@@ -208,35 +105,8 @@ adaptor_config_raw_sock(int sockfd, char* interface)
         return 0;
 }
 
-
-static void
-fill_sockaddr_in(struct sockaddr_in *to, struct inject_config *inject_cfg)
-{
-      memset (to, 0, sizeof (struct sockaddr_in));
-      to->sin_family = AF_INET;
-      to->sin_addr.s_addr = inject_cfg->iphdr.ip_dst.s_addr; 
-}
-
-
-//TODO: add return codes
-static void 
-ip4_pkt_assemble(struct inject_config *cfg)
-{
-        /* First part is an IPv4 header */
-        memcpy (cfg->packet, &cfg->iphdr, IP4_HDRLEN);
-
-        /* Next part of packet is upper layer protocol header : VTL header */
-        memcpy ((cfg->packet + IP4_HDRLEN), &cfg->vtlh, sizeof(struct vtlhdr));
-
-        /* Finally, add the VTL data = app payload */
-        memcpy (cfg->packet + IP4_HDRLEN + sizeof(struct vtlhdr), 
-                cfg->data, cfg->datalen);
-
-}
-
-
 static int 
-create_ip4_hdr(struct inject_config *cfg)
+create_ip4_hdr(vtl_md_t *vtl_md)
 {       
 
         int status; 
@@ -254,7 +124,7 @@ create_ip4_hdr(struct inject_config *cfg)
         hints.ai_flags = hints.ai_flags | AI_CANONNAME;
 
         /* Resolve target using getaddrinfo(). */
-        if ((status = getaddrinfo (cfg->target, NULL, &hints, &res)) != 0) {
+        if ((status = getaddrinfo (vtl_md->target, NULL, &hints, &res)) != 0) {
                 fprintf (stderr, "ERR: getaddrinfo() failed: %s\n", gai_strerror (status));
                 exit (EXIT_FAILURE);
         }
@@ -262,7 +132,7 @@ create_ip4_hdr(struct inject_config *cfg)
         // struct sockaddr_in *ipv4
         ipv4 = (struct sockaddr_in *) res->ai_addr;
         tmp = &(ipv4->sin_addr);
-        if (inet_ntop (AF_INET, tmp, cfg->dst_ip, INET_ADDRSTRLEN) == NULL) {
+        if (inet_ntop (AF_INET, tmp, vtl_md->dst_ip, INET_ADDRSTRLEN) == NULL) {
                 status = errno;
                 fprintf (stderr, 
                          "ERR: inet_ntop() failed.\nError message: %s", 
@@ -274,71 +144,100 @@ create_ip4_hdr(struct inject_config *cfg)
         /** IPv4 header **/
 
         /* IPv4 header length (4 bits): Number of 32-bit words in header = 5 */
-        cfg->iphdr.ip_hl = IP4_HDRLEN / sizeof (uint32_t);
+        vtl_md->iphdr.ip_hl = IP4_HDRLEN / sizeof (uint32_t);
 
         /* Internet Protocol version (4 bits): IPv4 */
-        cfg->iphdr.ip_v = 4;
+        vtl_md->iphdr.ip_v = 4;
 
         /* Type of service (8 bits) */
-        cfg->iphdr.ip_tos = 0;
+        vtl_md->iphdr.ip_tos = 0;
 
         /* Total length of datagram (16 bits): IP header + VTL header + VTL data */
-        cfg->iphdr.ip_len = htons (IP4_HDRLEN + sizeof(struct vtlhdr) + cfg->datalen);
+        vtl_md->iphdr.ip_len = htons (IP4_HDRLEN + sizeof(vtlhdr_t) + vtl_md->payload_s);
 
         /* ID sequence number (16 bits): unused, since single datagram */
-        cfg->iphdr.ip_id = htons (0);
+        vtl_md->iphdr.ip_id = htons (0);
 
         /* Flags, and Fragmentation offset (3, 13 bits): 0 since single datagram */
 
         /* Zero (1 bit) */
-        cfg->ip_flags[0] = 0;
+        vtl_md->ip_flags[0] = 0;
 
         /* Do not fragment flag (1 bit) */
-        cfg->ip_flags[1] = 0;
+        vtl_md->ip_flags[1] = 0;
 
         /* More fragments following flag (1 bit) */
-        cfg->ip_flags[2] = 0;
+        vtl_md->ip_flags[2] = 0;
 
         /* Fragmentation offset (13 bits) */
-        cfg->ip_flags[3] = 0;
+        vtl_md->ip_flags[3] = 0;
 
-        cfg->iphdr.ip_off = htons ((cfg->ip_flags[0] << 15)
-                                + (cfg->ip_flags[1] << 14)
-                                + (cfg->ip_flags[2] << 13)
-                                +  cfg->ip_flags[3]);
+        vtl_md->iphdr.ip_off = htons ((vtl_md->ip_flags[0] << 15)
+                                + (vtl_md->ip_flags[1] << 14)
+                                + (vtl_md->ip_flags[2] << 13)
+                                +  vtl_md->ip_flags[3]);
 
         /* Time-to-Live (8 bits): default to maximum value */
-        cfg->iphdr.ip_ttl = 255;
+        vtl_md->iphdr.ip_ttl = 255;
 
 
         /* Transport layer protocol (8 bits) */
-        cfg->iphdr.ip_p = IPPROTO_VTL;
+        vtl_md->iphdr.ip_p = IPPROTO_VTL;
 
         /* Source IPv4 address (32 bits) */
-        if ((status = inet_pton (AF_INET, cfg->src_ip, &(cfg->iphdr.ip_src))) != 1) {
+        if ((status = inet_pton (AF_INET, vtl_md->src_ip, &(vtl_md->iphdr.ip_src))) != 1) {
                 fprintf (stderr, "inet_pton() failed.\nError message: %s", strerror (status));
                 exit (EXIT_FAILURE);
         }
 
         /* Destination IPv4 address (32 bits) */
-        if ((status = inet_pton (AF_INET, cfg->dst_ip, &(cfg->iphdr.ip_dst))) != 1) {
+        if ((status = inet_pton (AF_INET, vtl_md->dst_ip, &(vtl_md->iphdr.ip_dst))) != 1) {
                 fprintf (stderr, "inet_pton() failed.\nError message: %s", strerror (status));
                 exit (EXIT_FAILURE);
         }
 
         /* IPv4 header checksum (16 bits): set to 0 when calculating checksum */
-        cfg->iphdr.ip_sum = 0;
-        cfg->iphdr.ip_sum = checksum ((uint16_t *) &cfg->iphdr, IP4_HDRLEN);
+        vtl_md->iphdr.ip_sum = 0;
+        vtl_md->iphdr.ip_sum = checksum ((uint16_t *) &vtl_md->iphdr, IP4_HDRLEN);
 
 
         return 0;
 }
 
+static void
+fill_sockaddr_in(struct sockaddr_in *to, vtl_md_t *vtl_md)
+{
+      memset (to, 0, sizeof (struct sockaddr_in));
+      to->sin_family = AF_INET;
+      to->sin_addr.s_addr = vtl_md->iphdr.ip_dst.s_addr; 
+}
+
+
+//TODO: add return codes
+static void 
+ip4_pkt_assemble(vtl_md_t *vtl_md)
+{
+        /* First part is an IPv4 header */
+        memcpy (vtl_md->packet, &vtl_md->iphdr, IP4_HDRLEN);
+
+        /* Next part of packet is upper layer protocol header : VTL header */
+        memcpy ((vtl_md->packet + IP4_HDRLEN), &vtl_md->vtlh, 
+                        sizeof(vtlhdr_t));
+
+        /* Finally, add the VTL data = app payload */
+        memcpy (vtl_md->packet + IP4_HDRLEN + sizeof(vtlhdr_t), 
+                vtl_md->payload, vtl_md->payload_s);
+
+}
+
+
+
+
 static int
-send_packet(int sock_fd, struct inject_config *inject_cfg , struct sockaddr_in *to)
+send_packet(int sock_fd, vtl_md_t *vtl_md , struct sockaddr_in *to)
 {
 
-        if (sendto (sock_fd, inject_cfg->packet, IP4_HDRLEN + sizeof(struct vtlhdr) + inject_cfg->datalen, 
+        if (sendto (sock_fd, vtl_md->packet, IP4_HDRLEN + sizeof(vtlhdr_t) + vtl_md->payload_s, 
                                 0, (struct sockaddr *) to, sizeof (struct sockaddr)) < 0)  {
                         perror ("ERR: sendto() failed ");
                         exit (EXIT_FAILURE);
@@ -349,19 +248,28 @@ send_packet(int sock_fd, struct inject_config *inject_cfg , struct sockaddr_in *
 
 
 int
-adaptor_send_packet(int sock_fd, struct inject_config *inject_cfg , 
+adaptor_send_packet(int sock_fd, vtl_md_t *vtl_md, 
                         struct sockaddr_in *to)
 {
-        
+        int ret;
+
         //TODO: redundancy ??
-        create_ip4_hdr(inject_cfg);
+        ret = create_ip4_hdr(vtl_md);
+        if (!ret) {
+                fprintf(stderr, "ERR: create_ip4_hdr() failed.");
+                return ret;
+        }
         
         /* fill destination sock_addr_in */
-        fill_sockaddr_in(to, inject_cfg);
+        fill_sockaddr_in(to, vtl_md);
 
-        ip4_pkt_assemble(inject_cfg);
+        ip4_pkt_assemble(vtl_md);
 
-        send_packet(sock_fd, inject_cfg, to);
+        ret = send_packet(sock_fd, vtl_md, to);
+        if (!ret) {
+                fprintf(stderr, "ERR: send_packet() failed.");
+                return ret;
+        }
 
         return 0;
 
