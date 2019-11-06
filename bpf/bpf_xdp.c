@@ -4,8 +4,7 @@
 #include <linux/ip.h>
 
 #include <linux/bpf.h>
-#include "bpf_helpers.h"
-
+#include "bpf/bpf_helpers.h"
 #include "../lib/vtl_util.h"
 
 struct bpf_map_def SEC("maps") xsks_map = {

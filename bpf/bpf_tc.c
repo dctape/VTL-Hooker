@@ -6,8 +6,9 @@
 #include <linux/pkt_cls.h> //TODO: add it to headers repo ?
 
 #include <linux/bpf.h>
-#include "bpf_helpers.h"
-#include "tc_bpf_util.h"
+
+#include "bpf/bpf_helpers.h"
+#include "bpf/tc_bpf_util.h"
 
 #include "../lib/vtl_util.h"
 
