@@ -214,7 +214,7 @@ xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id)
 }
 
 struct bpf_object *
-load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg)
+load_bpf_and_xdp_attach(xdp_cfg_t *xdp_cfg)
 {
 	struct bpf_program *bpf_prog;
 	struct bpf_object *bpf_obj;

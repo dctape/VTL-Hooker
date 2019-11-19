@@ -12,6 +12,9 @@
                 "vtl_util.h": "c",
                 "pkt_cls.h": "c",
                 "if_ether.h": "c",
-                "bpf.h": "c"
+                "bpf.h": "c",
+                "adaptor_send.h": "c",
+                "xsk_user_helpers.h": "c",
+                "xdp_user_helpers.h": "c"
         }
 }

@@ -153,7 +153,7 @@ create_ip4_hdr(vtl_md_t *vtl_md)
         vtl_md->iphdr.ip_tos = 0;
 
         /* Total length of datagram (16 bits): IP header + VTL header + VTL data */
-        vtl_md->iphdr.ip_len = htons (IP4_HDRLEN + sizeof(vtlhdr_t) + vtl_md->payload_s);
+        vtl_md->iphdr.ip_len = htons (IP4_HDRLEN + sizeof(vtlhdr_t) + vtl_md->snd_datalen);
 
         /* ID sequence number (16 bits): unused, since single datagram */
         vtl_md->iphdr.ip_id = htons (0);
@@ -218,15 +218,15 @@ static void
 ip4_pkt_assemble(vtl_md_t *vtl_md)
 {
         /* First part is an IPv4 header */
-        memcpy (vtl_md->packet, &vtl_md->iphdr, IP4_HDRLEN);
+        memcpy (vtl_md->snd_packet, &vtl_md->iphdr, IP4_HDRLEN);
 
         /* Next part of packet is upper layer protocol header : VTL header */
-        memcpy ((vtl_md->packet + IP4_HDRLEN), &vtl_md->vtlh, 
+        memcpy ((vtl_md->snd_packet + IP4_HDRLEN), &vtl_md->vtlh, 
                         sizeof(vtlhdr_t));
 
         /* Finally, add the VTL data = app payload */
-        memcpy (vtl_md->packet + IP4_HDRLEN + sizeof(vtlhdr_t), 
-                vtl_md->payload, vtl_md->payload_s);
+        memcpy (vtl_md->snd_packet + IP4_HDRLEN + sizeof(vtlhdr_t), 
+                vtl_md->snd_data, vtl_md->snd_datalen);
 
 }
 
@@ -236,8 +236,8 @@ ip4_pkt_assemble(vtl_md_t *vtl_md)
 static int
 send_packet(int sock_fd, vtl_md_t *vtl_md , struct sockaddr_in *to)
 {
-
-        if (sendto (sock_fd, vtl_md->packet, IP4_HDRLEN + sizeof(vtlhdr_t) + vtl_md->payload_s, 
+        size_t ip_pkt_size = IP4_HDRLEN + sizeof(vtlhdr_t) + vtl_md->snd_datalen;
+        if (sendto (sock_fd, vtl_md->snd_packet, ip_pkt_size, 
                                 0, (struct sockaddr *) to, sizeof (struct sockaddr)) < 0)  {
                         perror ("ERR: sendto() failed ");
                         exit (EXIT_FAILURE);
