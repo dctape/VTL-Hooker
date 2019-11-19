@@ -13,7 +13,7 @@
 
 #include <bpf/bpf.h> 
 
-#include "./raw_sock/raw_sock.h"
+#include "../raw_sock/raw_sock.h"
 #include "../common/tc_user_helpers.h" 
 #include "../lib/vtl_util.h"
 
