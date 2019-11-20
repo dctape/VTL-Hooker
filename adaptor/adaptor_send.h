@@ -14,8 +14,7 @@
 int adaptor_create_raw_sock(int domain, int protocol);
 int adaptor_config_raw_sock(int sockfd, char* interface);
 
-int adaptor_send_packet(int sock_fd, vtl_md_t *vtl_md, 
-                        struct sockaddr_in *to);
+int adaptor_send_packet(int sock_fd, vtl_md_t *vtl_md);
 
 
 

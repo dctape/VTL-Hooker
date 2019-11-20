@@ -11,6 +11,7 @@
 #include <string.h>           // strcpy, memset(), and memcpy()
 #include <errno.h>            // errno, perror()
 
+#include "../common/util.h"
 #include "adaptor_send.h"
 
 
@@ -248,11 +249,10 @@ send_packet(int sock_fd, vtl_md_t *vtl_md , struct sockaddr_in *to)
 
 
 int
-adaptor_send_packet(int sock_fd, vtl_md_t *vtl_md, 
-                        struct sockaddr_in *to)
+adaptor_send_packet(int sock_fd, vtl_md_t *vtl_md)
 {
         int ret;
-
+        struct sockaddr_in to
         //TODO: redundancy ??
         ret = create_ip4_hdr(vtl_md);
         if (!ret) {
@@ -261,11 +261,11 @@ adaptor_send_packet(int sock_fd, vtl_md_t *vtl_md,
         }
         
         /* fill destination sock_addr_in */
-        fill_sockaddr_in(to, vtl_md);
+        fill_sockaddr_in(&to, vtl_md);
 
         ip4_pkt_assemble(vtl_md);
 
-        ret = send_packet(sock_fd, vtl_md, to);
+        ret = send_packet(sock_fd, vtl_md, &to);
         if (!ret) {
                 fprintf(stderr, "ERR: send_packet() failed.");
                 return ret;

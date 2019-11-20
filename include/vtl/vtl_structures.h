@@ -39,6 +39,7 @@ struct vtl_metadata {
         struct ifreq ifr;// TODO: is it necessary ?
         struct ip iphdr;
 
+        int af_inet_sock;
         struct xsk_socket_info *xsk_socket;
         xdp_cfg_t *xdp_cfg;
         
