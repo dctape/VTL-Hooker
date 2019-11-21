@@ -16,6 +16,7 @@ struct xdp_config {
 	char pin_dir[512];
 	bool do_unload;
 	bool reuse_maps;
+	bool use_xsksock;
 
 	__u32 xdp_flags;
 	int ifindex;
@@ -23,9 +24,11 @@ struct xdp_config {
 	char ifname_buf[IF_NAMESIZE];
 
 	/* af_xdp */
+	// Not the good location
 	__u16 xsk_bind_flags;
 	int xsk_if_queue;
 	bool xsk_poll_mode;
+
 	// int redirect_ifindex;
 	// char *redirect_ifname;
 	// char redirect_ifname_buf[IF_NAMESIZE];	
