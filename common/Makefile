@@ -10,7 +10,8 @@ OBJS += xdp_user_helpers.o
 OBJS += xsk_user_helpers.o
 
 CC := gcc
-CFLAGS := -g -Wall
+CFLAGS := -g -Wall -Wextra
+CFLAGS += -Wnull-dereference -Wjump-misses-init
 
 LIBBPF_DIR = ../libbpf/src/
 CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers

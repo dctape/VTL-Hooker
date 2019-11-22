@@ -9,6 +9,7 @@
 #define CMD_MAX_TC	256
 static char tc_cmd[CMD_MAX_TC] = "tc";
 
+//TODO: Evaluer la possibilité de se séparer de struct tc_config
 //TODO: ajouter le nom de section
 //TODO: https://github.com/xdp-project/xdp-cpumap-tc/blob/master/src/common_user.c
 int 

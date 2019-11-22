@@ -17,6 +17,7 @@ struct xdp_config {
 	bool do_unload;
 	bool reuse_maps;
 	bool use_xsksock;
+	int xsks_map_fd;
 
 	__u32 xdp_flags;
 	int ifindex;

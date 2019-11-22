@@ -1,9 +1,20 @@
 #ifndef __LAUNCHER_H
 #define __LAUNCHER_H
 
-//deployy/remove flags
-#define TC_INGRESS      0
-#define TC_EGRESS       1
+#include "../common/tc_user_helpers.h"
+#include "../common/xdp_user_helpers.h"
 
+
+//deployy/remove flags
+//TODO: Find a better name
+#define TC_INGRESS_ATTACH      0
+#define TC_EGRESS_ATTACH       1
+
+
+int launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int flags);
+int launcher_remove_tc_tf(struct tc_config *cfg, int flags);
+
+int launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, int flags);
+int launcher_remove_xdp_tf(struct xdp_config *cfg);
 
 #endif /* __LAUNCHER_H */

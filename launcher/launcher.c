@@ -2,20 +2,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <bpf/bpf.h>
-#include <bpf/xsk.h>
 #include <linux/if_link.h>
+
+#include <bpf/libbpf.h>
 
 #include "../common/tc_user_helpers.h"
 #include "../common/xdp_user_helpers.h"
 
 #include "launcher.h"
 
-//deploy tc tf
+/** 
+  * @desc: deploy transport functions on tc hook
+  * @param: struct tc_config *cfg - configure tc attachment
+  * @param: char *tf_file - bpf file to load in kernel
+  * @param: char *interface - interface where to load tf
+  * @param: int flags -        
+  * @return: 
+  * 
+*/ 
 int
-launcher_deploy_tc_tf(char *tf_file, char *interface, int flags)
+launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int flags)
 {
         int ifindex = if_nametoindex(interface);    
+        
         //TODO : change this part later... remove egress
         if (!(ifindex)) { 
                         fprintf(stderr,
@@ -24,23 +33,24 @@ launcher_deploy_tc_tf(char *tf_file, char *interface, int flags)
                         return EXIT_FAILURE;
         }
 
-        struct tc_config cfg = {
-                .filename = tf_file,
-                .dev = interface
-        };
+        //WARN: strcpy is not very safe, it's better to uses his self-made function
+        //...or strncpy ??
+        strcpy(cfg->filename, tf_file);
+        cfg->dev = interface;
+       
         printf("Inject tc-bpf-file in the kernel...\n");
-        printf("TC attach BPF object %s to device %s\n", cfg.filename, cfg.dev);
+        printf("TC attach BPF object %s to device %s\n", cfg->filename, cfg->dev);
 
         switch (flags)
         {
-                case TC_INGRESS:
+                case TC_INGRESS_ATTACH:
                         //Fill in later...
                         return 0;
                         break;
                 
-                case TC_EGRESS:
+                case TC_EGRESS_ATTACH:
                        //TODO: return code
-                        if (tc_egress_attach_bpf(&cfg)) {
+                        if (tc_egress_attach_bpf(cfg)) {
                                 fprintf(stderr, "ERR: TC attach failed\n");
                                 return EXIT_FAILURE;
                         }
@@ -54,26 +64,28 @@ launcher_deploy_tc_tf(char *tf_file, char *interface, int flags)
         return 0;
 }
 
-//remove tc tf
+/** 
+  * @desc: remove transport functions on tc hook
+  * @param: struct tc_config *cfg - 
+  * @param: int flags -        
+  * @return: 
+  * 
+*/ 
 int
-launcher_remove_tc_tf(char *tf_file, char *interface, int flags)
+launcher_remove_tc_tf(struct tc_config *cfg, int flags)
 {       
-        struct tc_config cfg = {
-                .filename = tf_file,
-                .dev = interface
-        };
-
+       
         /*  remove tc-bpf program */
-        printf("TC remove tc-bpf program on device %s\n", cfg.dev);
+        printf("TC remove tc-bpf program on device %s\n", cfg->dev);
         switch (flags)
         {
-                case TC_INGRESS:
+                case TC_INGRESS_ATTACH:
                         // Fill this later...                 
                         return 0;
                         break;
                 
-                case TC_EGRESS:
-                        tc_remove_egress(&cfg);
+                case TC_EGRESS_ATTACH:
+                        tc_remove_egress(cfg);
                         break;
                 
                 default:
@@ -87,9 +99,6 @@ launcher_remove_tc_tf(char *tf_file, char *interface, int flags)
 }
 
 
-//deploy xdp tf
-//TODO: test on tf_file
-//TODO: test on interface
 /** 
   * @desc: deploy transport functions on xdp hook
   * @param: struct xdp_config *cfg - configure xdp attachment
@@ -109,6 +118,7 @@ launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, i
         //TODO: 2nd test on tf_file - verify that ebpf prog type is XDP
 
         //WARN: strcpy is not very safe, it's better to uses his self-made function
+        //...or strncpy ??
         strcpy(cfg->filename, tf_file);
         strcpy(cfg->progsec, "xdp_sock");
         
@@ -126,12 +136,13 @@ launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, i
         // XDP Flags
         cfg->xdp_flags = flags;
 
-        bpf_obj = load_bpf_and_xdp_attach(&cfg);
+        bpf_obj = load_bpf_and_xdp_attach(cfg);
 	if (!bpf_obj) {
 		/* Error handling done in load_bpf_and_xdp_attach() */
 		exit(EXIT_FAILURE);
 	}
 
+        //TODO: Not the good location
         if (cfg->use_xsksock == true) {
 
                 struct bpf_map *map = NULL;
@@ -147,18 +158,14 @@ launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, i
         return 0;
 }
 
-
-//remove xdp tf
 /** 
   * @desc: remove transport functions on xdp hook
-  * @param: struct xdp_config *cfg - configure xdp attachment
-  * @param: char *tf_file - bpf file to remove on xdp hook
-  * @param: char *interface - NIC where to remove xdp tf        
+  * @param: struct xdp_config *cfg -        
   * @return: 
   * 
 */
 int
-launcher_remove_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface)
+launcher_remove_xdp_tf(struct xdp_config *cfg)
 {
          
         xdp_link_detach(cfg->ifindex, cfg->xdp_flags, 0);
