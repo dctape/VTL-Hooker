@@ -62,6 +62,8 @@ vtl_snd(vtl_md_t *vtl_md, char *dst_ip, uint8_t *data,  size_t datalen)
         /* send vtl packet */
         adaptor_send_packet(vtl_md->af_inet_sock, vtl_md);
 
+        return 0;
+
 }
 
 //vtl_rcv: recoit des données via la vtl
@@ -71,7 +73,8 @@ vtl_rcv(vtl_md_t *vtl_md, void *buf)
 {       
         //TODO: add return code
         adaptor_rcv_data(vtl_md);
-        buf = vtl_md->rcv_data;
+        //buf = vtl_md->rcv_data;
+        memcpy(buf, vtl_md->rcv_data, vtl_md->rcv_datalen);
 
         return vtl_md->rcv_datalen;
 }
