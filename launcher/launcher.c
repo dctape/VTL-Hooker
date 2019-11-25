@@ -37,7 +37,9 @@ launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int
         //WARN: strcpy is not very safe, it's better to uses his self-made function
         //...or strncpy ??
         strcpy(cfg->filename, tf_file);
-        cfg->dev = interface;
+        //snprintf(cfg->filename, sizeof(cfg->filename), "%s", tf_file);
+        strcpy(cfg->dev, interface);
+        //cfg->dev = interface;
        
         printf("Inject tc-bpf-file in the kernel...\n");
         printf("TC attach BPF object %s to device %s\n", cfg->filename, cfg->dev);

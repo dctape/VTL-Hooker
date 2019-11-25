@@ -5,7 +5,7 @@
 
 #include "../launcher/launcher.h"
 
-#define BPF_TC_FILENAME "../bpf/bpf_tc.c"
+#define BPF_TC_FILENAME         "../bpf/bpf_tc.o"
 
 int main()
 {

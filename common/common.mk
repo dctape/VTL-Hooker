@@ -18,8 +18,8 @@ LLC ?= llc
 CLANG ?= clang
 CC ?= gcc
 
-KERN_SRC = ${KERN_TARGETS:=.c}
-KERN_OBJ = ${KERN_SRC:.c=.o}
+#KERN_SRC = ${KERN_TARGETS:=.c}
+#KERN_OBJ = ${KERN_SRC:.c=.o}
 USER_SRC := ${USER_TARGETS:=.c}
 USER_OBJ := ${USER_SRC:.c=.o}
 
@@ -53,7 +53,7 @@ EXTRA_DEPS +=
 
 # BPF-prog kern and userspace shares struct via header file:
 ## Intéressant comme approche...
-KERN_USER_H ?= $(wildcard common_kern_user.h)
+# KERN_USER_H ?= $(wildcard common_kern_user.h)
 
 ## En-tête pour les fichiers sources
 CFLAGS ?= -I$(LIBBPF_DIR)/build/usr/include/ -g
@@ -72,7 +72,7 @@ LIBS = -l:libbpf.a -lelf $(USER_LIBS)
 ## llvm-check : quelques vérification au niveau du compilateur llvm
 ## $(USER_TARGETS) : compilation normale pour le fichier d'en-tête
 ## $(KERN_OBJ) : compilation des fichiers kern objets => indispensable
-all: llvm-check $(USER_TARGETS) $(KERN_OBJ)
+all: llvm-check $(USER_TARGETS) 
 
 .PHONY: clean $(CLANG) $(LLC)
 
@@ -84,7 +84,7 @@ clean:
 	$(MAKE) -C $(COMMON_DIR) clean
 	# $(MAKE) -C $(ADAPTER_DIR) clean
 #	rm -f $(USER_TARGETS) $(XDP_OBJ) $(USER_OBJ) $(COPY_LOADER) $(COPY_STATS)
-	rm -f $(USER_TARGETS) $(KERN_OBJ) $(USER_OBJ)
+	rm -f $(USER_TARGETS) $(USER_OBJ)
 	rm -f *.ll
 	rm -f *~
 
@@ -121,19 +121,19 @@ $(COMMON_H): %.h: %.c
 $(COMMON_OBJS): %.o: %.h
 	make -C $(COMMON_DIR)
 
-$(USER_TARGETS): %: %.c $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
-	$(CC) -Wall $(CFLAGS) $(USER_DEPS) $(LDFLAGS) -o $@ $(COMMON_OBJS) \
+$(USER_TARGETS): %: %.c $(OBJECT_LIBBPF) Makefile $(COMMON_MK) $(COMMON_OBJS) $(DEPS_OBJS) $(KERN_USER_H) $(EXTRA_DEPS)
+	$(CC) -Wall $(CFLAGS) $(USER_DEPS) $(LDFLAGS) -o $@ $(COMMON_OBJS) $(DEPS_OBJS) \
 	 $< $(LIBS)
 
-$(KERN_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(KERN_DEPS)
-	$(CLANG) -S \
-	    -target bpf \
-	    -D __BPF_TRACING__ \
-	    $(CFLAGS) \
-	    -Wall \
-	    -Wno-unused-value \
-	    -Wno-pointer-sign \
-	    -Wno-compare-distinct-pointer-types \
-	    -Werror \
-	    -O2 -emit-llvm -c -g -o ${@:.o=.ll} $<
-	$(LLC) -march=bpf -filetype=obj -o $@ ${@:.o=.ll}
+# $(KERN_OBJ): %.o: %.c  Makefile $(COMMON_MK) $(KERN_USER_H) $(EXTRA_DEPS) $(KERN_DEPS)
+# 	$(CLANG) -S \
+# 	    -target bpf \
+# 	    -D __BPF_TRACING__ \
+# 	    $(CFLAGS) \
+# 	    -Wall \
+# 	    -Wno-unused-value \
+# 	    -Wno-pointer-sign \
+# 	    -Wno-compare-distinct-pointer-types \
+# 	    -Werror \
+# 	    -O2 -emit-llvm -c -g -o ${@:.o=.ll} $<
+# 	$(LLC) -march=bpf -filetype=obj -o $@ ${@:.o=.ll}

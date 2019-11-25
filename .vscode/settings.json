@@ -20,6 +20,7 @@
                 "libbpf.h": "c",
                 "if_link.h": "c",
                 "vtl_structures.h": "c",
-                "stdint.h": "c"
+                "stdint.h": "c",
+                "launcher.h": "c"
         }
 }
