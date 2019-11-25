@@ -10,7 +10,9 @@
 #include "bpf/bpf_helpers.h"
 #include "bpf/tc_bpf_util.h"
 
-#include "../lib/vtl_util.h"
+//TODO: replace later with vtl_structures.h
+#include "../include/vtl/vtl_util.h"
+#include "../include/vtl/vtl_macros.h"
 
 
 // #define MAX_IP_HDR_LEN          60
@@ -140,7 +142,7 @@ int _tf_tc_egress(struct __sk_buff *skb)
 	         return TC_ACT_OK;
 	
 	//TODO: Modify with bpf_skb_store_bytes ?
-	struct vtlhdr *vtlh = (struct vtlhdr *)(iph + 1);
+	vtlhdr_t *vtlh = (vtlhdr_t *)(iph + 1);
 	if(vtlh + 1 > data_end)
              return TC_ACT_OK;
 

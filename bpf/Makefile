@@ -3,15 +3,22 @@
 BPF_TARGETS := bpf_tc.o
 BPF_TARGETS += bpf_xdp.o
 
-INCLUDE = include
+#LIBBPF_DIR = ../libbpf/src/
+
+INCLUDE_BPF = include
+INCLUDE_VTL = ../include/vtl
 
 LLC ?= llc
 CLANG ?= clang
 CC ?= gcc
 
-CFLAGS ?= -I./include
+CFLAGS ?= -I./$(INCLUDE_BPF)
+## A cause de xsk socket => include/vtl
+## TODO: Briser cette dépendance.
+#CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -I../headers
 
-EXTRA_DEPS +=
+EXTRA_DEPS := $(INCLUDE_VTL)/vtl_util.h
+EXTRA_DEPS += $(INCLUDE_VTL)/vtl_macros.h 
 
 all: $(BPF_TARGETS)
 

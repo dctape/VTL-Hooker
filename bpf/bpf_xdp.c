@@ -5,7 +5,9 @@
 
 #include <linux/bpf.h>
 #include "bpf/bpf_helpers.h"
-#include "../lib/vtl_util.h"
+
+#include "../include/vtl/vtl_util.h"
+#include "../include/vtl/vtl_macros.h"
 
 struct bpf_map_def SEC("maps") xsks_map = {
 	.type = BPF_MAP_TYPE_XSKMAP,
