@@ -5,13 +5,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
+#include <unistd.h>
 
 #include <sys/resource.h>
 
 #include <net/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_link.h>
-#include <linux/ip.h>
+
+//WARN: Rentre en conflit avec netinet/ip.h
+//#include <linux/ip.h>
+
+#include "../include/vtl/vtl_macros.h"
+#include "../include/vtl/vtl_structures.h"
 
 #include "../common/xsk_user_helpers.h"
 
@@ -88,7 +95,10 @@ process_packet(struct xsk_socket_info *xsk, uint64_t addr,
 	data_size = len - hdr_size;	
 	
         //TODO: Make a linked list or a ring buffer ???
-	rcv_data = data;
+	//rcv_data = data;
+	//WARN: strcpy...
+	//strcpy(rcv_data, data);
+	memcpy(rcv_data, data, data_size);
         *rcv_datalen = data_size;
 	
 	return true;
@@ -116,6 +126,7 @@ handle_receive_packets(struct xsk_socket_info *xsk, uint8_t *rcv_data, size_t *r
 					     &idx_fq);
 
 		/* This should not happen, but just in case */
+		//warning: comparison between signed and unsigned integer expressions
 		while (ret != stock_frames)
 			ret = xsk_ring_prod__reserve(&xsk->umem->fq, rcvd,
 						     &idx_fq);

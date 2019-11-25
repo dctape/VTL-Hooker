@@ -11,7 +11,10 @@
 #include <string.h>           // strcpy, memset(), and memcpy()
 #include <errno.h>            // errno, perror()
 
+#include "../include/vtl/vtl_macros.h"
+#include "../include/vtl/vtl_structures.h"
 #include "../common/util.h"
+
 #include "adaptor_send.h"
 
 
@@ -252,7 +255,7 @@ int
 adaptor_send_packet(int sock_fd, vtl_md_t *vtl_md)
 {
         int ret;
-        struct sockaddr_in to
+        struct sockaddr_in to;
         //TODO: redundancy ??
         ret = create_ip4_hdr(vtl_md);
         if (!ret) {

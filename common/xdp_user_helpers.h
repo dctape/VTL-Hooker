@@ -4,6 +4,9 @@
 
 #include <linux/types.h>
 #include <net/if.h>
+#include <stdbool.h> // error: unknown type name ‘bool’...Weird
+
+
 
 //#include <bpf/libbpf.h>
 //#include "common_libbpf.h"

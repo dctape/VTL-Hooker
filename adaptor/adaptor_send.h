@@ -7,7 +7,6 @@
 #include <sys/ioctl.h>        // macro ioctl is defined
 #include <sys/types.h>        // needed for socket(), uint8_t, uint16_t, uint32_t
 
-#include "../include/vtl/vtl_macros.h"
 #include "../include/vtl/vtl_structures.h"
 
 
