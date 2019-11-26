@@ -10,7 +10,7 @@
 #include "defines.h"
 #include "util_libbpf.h"
 // TODO : Trouver une meilleure alternative
-#include "../lib/config.h" // pour la définition sock_key_t
+#include "../include/vtl/config.h" // pour la définition sock_key_t
 
 #include "sock_user_helpers.h"
 
