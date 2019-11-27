@@ -16,11 +16,11 @@
 int menu_start(void)
 {
         int choice;
-        printf("KTF Orchestrator menu\n");
+        printf("\n\tKTF Orchestrator menu\n\n");
         printf("Choose from the options given below\n");
-        printf("1- Deploy TF\n");
-        printf("2- Remove TF\n");
-        printf("3- Exit KTF Orchestrator\n\n");
+        printf("->> 1- Deploy TF\n");
+        printf("->> 2- Remove TF\n");
+        printf("->> 3- Exit KTF Orchestrator\n\n");
 
         printf("Enter your choice: ");
         scanf("%d", &choice);
@@ -32,10 +32,11 @@ int menu_start(void)
 int menu_mode(void)
 {
         int choice;
-
+        printf("\n\tKTF Orchestrator\n\n");
         printf("Choose mode:\n");
-        printf("1- Input mode (reception)\n");
-        printf("2- Output mode (emission)\n\n");
+        printf("->> 1- Input mode (reception ~~ XDP)\n");
+        printf("->> 2- Output mode (emission ~~ TC)\n\n");
+        
         //3- return to menu start
 
         printf("Enter your choice: ");
@@ -52,7 +53,7 @@ void select_interface(char *interface)
         int count = 1, n;
 
         //First get the list of available devices
-        printf("Finding available devices ... ");
+        printf("\nFinding available devices ... ");
         if (pcap_findalldevs(&alldevsp, errbuf))
         {
                 printf("Error finding devices : %s", errbuf);
@@ -64,7 +65,7 @@ void select_interface(char *interface)
         printf("\nAvailable Devices are :\n");
         for (device = alldevsp; device != NULL; device = device->next)
         {
-                printf("%d. %s - %s\n", count, device->name, device->description);
+                printf("->> %d. %s - %s\n", count, device->name, device->description);
                 if (device->name != NULL)
                 {
                         strcpy(devs[count], device->name);
@@ -72,10 +73,8 @@ void select_interface(char *interface)
                 count++;
         }
         //Ask user which device to use
-        printf("Enter the number of the device you want use : ");
+        printf("\nEnter the number of the device you want use : ");
         scanf("%d", &n);
-        printf("\nselected interface : %s",devs[n]);
-        //*interface = devs[n];
         strcpy(interface, devs[n]);
 }
 
@@ -176,9 +175,13 @@ void clear_screen()
 int main()
 {
         int ret;
+        int c;
 
         int menu_choice;
         int mode;
+        char enter = 0;
+
+        clear_screen();
 
         do
         {
@@ -186,27 +189,36 @@ int main()
                 menu_choice = menu_start();
                 clear_screen();
 
+                /* clear input buffer */
+                while ((c = getchar()) != '\n' && c != EOF) { } 
+
                 switch (menu_choice)
                 {
                 case 1 /* Deploy TF*/:
                         
                         //TODO: Display TF list
                         mode = menu_mode();
-                        clear_screen();
-
+    
                         deploy_tf(mode);
 
-                        printf("\nReturn to menu start\n");
-                        sleep(2);
+                        /* clear input buffer */
+                        while ((c = getchar()) != '\n' && c != EOF) { }
+
+                        printf("\nPress Enter to return to menu start\n");
+                        while (enter != '\r' && enter != '\n') { enter = getchar(); }
+  
                         clear_screen();
 
                         break;
                 case 2 /* Remove TF */:
                         mode = menu_mode();
-                        remove_tf(mode); 
+                        remove_tf(mode);
 
-                        printf("\nReturn to menu start\n");
-                        sleep(2);
+                        /* clear input buffer */
+                        while ((c = getchar()) != '\n' && c != EOF) { } 
+
+                        printf("\nPress Enter to return to menu start\n");                      
+                        while (enter != '\r' && enter != '\n') { enter = getchar(); }
                         
                         clear_screen();
 

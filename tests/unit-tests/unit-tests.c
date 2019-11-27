@@ -45,6 +45,20 @@ int main()
         select_interface(interface);
         printf("\nselected interface : %s - size: %ld\n",interface
                 , strlen(interface));
+        
+        
+        /* clear input buffer */
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF) { }
+
+        printf("Press enter to continue\n");
+        int enter = 0;
+        while (enter != '\r' && enter != '\n') { enter = getchar(); }
+        printf("Thank you for pressing enter\n");
+
+        // printf("Press Enter to Continue");
+        // getchar();
+        // // while( getchar() != '\n' );
 
         return 0;
 }
