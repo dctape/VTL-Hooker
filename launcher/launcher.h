@@ -12,9 +12,9 @@
 
 
 int launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int flags);
-int launcher_remove_tc_tf(struct tc_config *cfg, int flags);
+int launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags);
 
 int launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, int flags);
-int launcher_remove_xdp_tf(struct xdp_config *cfg);
+int launcher_remove_xdp_tf(struct xdp_config *cfg, char *interface, int flags);
 
 #endif /* __LAUNCHER_H */

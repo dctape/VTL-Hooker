@@ -21,6 +21,7 @@
                 "if_link.h": "c",
                 "vtl_structures.h": "c",
                 "stdint.h": "c",
-                "launcher.h": "c"
+                "launcher.h": "c",
+                "pcap.h": "c"
         }
 }

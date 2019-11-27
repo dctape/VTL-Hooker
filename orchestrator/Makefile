@@ -14,3 +14,5 @@ EXTRA_DEPS := $(LAUNCHER_DIR)/launcher.h
 DEPS_OBJS = $(LAUNCHER_DIR)/launcher.o
 
 include $(COMMON_DIR)/common.mk
+
+LIBS += -lpcap

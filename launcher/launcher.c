@@ -4,7 +4,7 @@
 
 #include <linux/if_link.h>
 
-//TODO: délier launcher de libbpf
+//TODO: découpler launcher de libbpf
 #include <bpf/libbpf.h>
 
 #include "../common/tc_user_helpers.h"
@@ -75,8 +75,21 @@ launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int
   * 
 */ 
 int
-launcher_remove_tc_tf(struct tc_config *cfg, int flags)
+launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
 {       
+
+        int ifindex = if_nametoindex(interface);    
+        
+        //TODO : change this part later... remove egress
+        if (!(ifindex)) { 
+                        fprintf(stderr,
+                                "ERR: --egress \"%s\" not real dev\n",
+                                        interface);
+                        return EXIT_FAILURE;
+        }
+
+        //snprintf(cfg->filename, sizeof(cfg->filename), "%s", tf_file);
+        strcpy(cfg->dev, interface);
        
         /*  remove tc-bpf program */
         printf("TC remove tc-bpf program on device %s\n", cfg->dev);
@@ -118,6 +131,7 @@ launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, i
 
         if (tf_file[0] == 0)
                 return EXIT_FAIL;
+
         //TODO: 2nd test on tf_file - verify that ebpf prog type is XDP
 
         //WARN: strcpy is not very safe, it's better to uses his self-made function
@@ -163,13 +177,24 @@ launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, i
 
 /** 
   * @desc: remove transport functions on xdp hook
-  * @param: struct xdp_config *cfg -        
+  * @param: struct xdp_config *cfg -
+  * @param: char *interface - NIC where to remove tf
+  * @param: flags -         
   * @return: 
   * 
 */
 int
-launcher_remove_xdp_tf(struct xdp_config *cfg)
+launcher_remove_xdp_tf(struct xdp_config *cfg, char *interface, int flags)
 {
+        //TODO: redundant, find a better way...
+        cfg->ifindex = if_nametoindex(interface);
+        strcpy(cfg->ifname, interface);
+        if (cfg->ifindex == -1) {
+		fprintf(stderr, "ERROR: Required option --dev missing\n\n");
+		return EXIT_FAIL_OPTION;
+	}
+        // XDP Flags
+        cfg->xdp_flags = flags;
          
         xdp_link_detach(cfg->ifindex, cfg->xdp_flags, 0);
         return 0;
