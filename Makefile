@@ -2,7 +2,7 @@
 # CLANG = clang
 
 
-MODULES := adaptor bpf launcher
+MODULES := adaptor api bpf launcher
 ORCHESTRATOR := orchestrator
 
 MODULES_CLEAN = $(addsuffix _clean, $(MODULES))

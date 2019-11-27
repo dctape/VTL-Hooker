@@ -7,7 +7,8 @@
 //TODO: change with <vtl/..>
 #include "../include/vtl/vtl_macros.h"
 #include "../include/vtl/vtl_structures.h"
-#include "../include/vtl/vtl_util.h"
+// Make compilation failed
+//#include "../include/vtl/vtl_util.h" 
 
 #include "../common/util.h"
 
@@ -61,6 +62,9 @@ vtl_snd(vtl_md_t *vtl_md, char *dst_ip, uint8_t *data,  size_t datalen)
         //TODO: Revoir cette partie
         /* send vtl packet */
         adaptor_send_packet(vtl_md->af_inet_sock, vtl_md);
+
+        //TODO: memset snd_data ?
+
 
         return 0;
 
