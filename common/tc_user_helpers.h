@@ -7,7 +7,7 @@
 struct tc_config {
 
         char filename[512];
-        char *dev;
+        char dev[20];
 
 };
 

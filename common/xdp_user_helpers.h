@@ -24,7 +24,8 @@ struct xdp_config {
 
 	__u32 xdp_flags;
 	int ifindex;
-	char *ifname;
+	//TODO: static bloc ??
+	char ifname[20];
 	char ifname_buf[IF_NAMESIZE];
 
 	/* af_xdp */
