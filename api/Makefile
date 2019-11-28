@@ -5,6 +5,15 @@ ADAPTOR_DIR = ../adaptor
 COMMON_DIR = ../common
 INCLUDE_DIR = ../include
 
+LIBVTL_OBJS := api.o
+LIBVTL_OBJS += $(ADAPTOR_DIR)/adaptor_receive.o
+LIBVTL_OBJS += $(ADAPTOR_DIR)/adaptor_send.o
+LIBVTL_OBJS += $(COMMON_DIR)/util.o
+
+STATIC_LIBVTL = $(API_DIR)/libvtl.a
+
+AR = ar
+
 CC := gcc
 CFLAGS := -g -Wall -Wextra
 CFLAGS += -Wnull-dereference -Wjump-misses-init
@@ -24,12 +33,16 @@ DEPS_H += $(COMMON_DIR)/util.h
 
 # TODO : améliorer cette partie
 # TODO: Do we need to make libbpf from this make file too?
-all: $(OBJS)
+all: $(OBJS) $(STATIC_LIBVTL)
 
 .PHONY: clean
 
-clean:
+clean:	
+	rm -f $(STATIC_LIBVTL)
 	rm -f $(OBJS)
 
 $(OBJS): %.o: %.c %.h $(DEPS_H)
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(STATIC_LIBVTL): $(LIBVTL_OBJS)
+	$(AR) rcs $@ $

@@ -2,15 +2,23 @@
 # CLANG = clang
 
 
-MODULES := adaptor api bpf launcher
+
+MODULES := adaptor bpf launcher
+LIBVTL_DIR := api
 ORCHESTRATOR := orchestrator
+TESTS = tests
 
 MODULES_CLEAN = $(addsuffix _clean, $(MODULES))
+LIBVTL_CLEAN = $(addsuffix _clean, $(LIBVTL_DIR ))
 ORCHESTRATOR_CLEAN = $(addsuffix _clean, $(ORCHESTRATOR))
-VTL_CLEAN = $(MODULES_CLEAN) $(ORCHESTRATOR_CLEAN)
+TESTS_CLEAN = $(addsuffix _clean, $(TESTS))
+
+VTL_CLEAN = $(LIBVTL_CLEAN) $(TESTS_CLEAN) $(ORCHESTRATOR_CLEAN) $(MODULES_CLEAN)  
+
 
 
 LIBBPF_DIR = libbpf/src/
+
 OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
 
 all: dependencies build
@@ -21,9 +29,8 @@ all: dependencies build
 $(VTL_CLEAN):
 	$(MAKE) -C $(subst _clean,,$@) clean
 
+
 clean: $(VTL_CLEAN)
-
-
 
 
 # Compilation de la bibliothèque statique libbpf
@@ -48,10 +55,24 @@ $(MODULES) $(ORCHESTRATOR): force
 build-modules: $(MODULES)
 	@echo "Build modules finished."
 
+
+$(LIBVTL_DIR): force
+	$(MAKE) -C $@ 
+
+build-libvtl: $(LIBVTL_DIR)
+	@echo "Build libvtl finished."
+
 build-orchestrator: $(ORCHESTRATOR)
 	@echo "Build orchestrator finished."
 
-build: build-modules build-orchestrator
+$(TESTS): force
+	$(MAKE) -C $@
+
+build-tests: $(TESTS)
+	@echo "Build tests finished."
+
+
+build: build-modules build-libvtl build-orchestrator build-tests
 
 
 force :;
