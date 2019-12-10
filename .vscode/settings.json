@@ -22,6 +22,8 @@
                 "vtl_structures.h": "c",
                 "stdint.h": "c",
                 "launcher.h": "c",
-                "pcap.h": "c"
+                "pcap.h": "c",
+                "defines.h": "c",
+                "vtl_macros.h": "c"
         }
 }

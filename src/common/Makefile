@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: (GPL-2.0)
+
+# OBJS := params.o
+# OBJS += util_libbpf.o
+# OBJS += util_user_maps.o
+# OBJS += cgroup_helpers.o
+# OBJS += sock_user_helpers.o
+# OBJS += tc_user_helpers.o
+# OBJS += xdp_user_helpers.o
+# OBJS += xsk_user_helpers.o
+
+OBJS := tc_user_helpers.o
+
+CC := gcc
+CFLAGS += -g -Wall -Wextra -Wpedantic \
+          -Wformat=2 -Wno-unused-parameter -Wshadow \
+          -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+          -Wredundant-decls -Wnested-externs -Wmissing-include-dirs 
+CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
+CFLAGS += -O2
+
+# LIBBPF_DIR = ../libbpf/src/
+# CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
+
+# TODO : améliorer cette partie
+# TODO: Do we need to make libbpf from this make file too?
+all: $(OBJS)
+
+.PHONY: clean
+
+clean:
+	rm -f $(OBJS)
+
+$(OBJS):%.o: %.c %.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+
+#TODO: add common_libbpf.h ?
+#TODO: don't forget dependencies like defines.h
+# common_user_bpf_xdp.o: common_user_bpf_xdp.c common_libbpf.h common_user_bpf_xdp.h 	
+# 	$(CC) $(CFLAGS) -c -o $@ $< 
+#common_user_bpf_socket.o: common_user_bpf_socket.c common_libbpf.h common_user_bpf_socket.h
+
+
+

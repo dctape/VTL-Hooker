@@ -9,6 +9,7 @@
 #define IP4_HDRLEN            20 // IPv4 header length
 #define DATASIZE              1024 // ideal size ? 1024 ? 16k ?
 
+#define VTL_ERRBUF_SIZE       256 
 
 
 #endif /* __VTL_MACROS_H */
