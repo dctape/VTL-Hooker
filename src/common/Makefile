@@ -1,15 +1,18 @@
-# SPDX-License-Identifier: (GPL-2.0)
+ROOT_DIR = ../..
 
-# OBJS := params.o
-# OBJS += util_libbpf.o
-# OBJS += util_user_maps.o
-# OBJS += cgroup_helpers.o
-# OBJS += sock_user_helpers.o
-# OBJS += tc_user_helpers.o
-# OBJS += xdp_user_helpers.o
-# OBJS += xsk_user_helpers.o
+OBJS := util.o
+OBJS += tc_user_helpers.o
+OBJS += xdp_user_helpers.o
+OBJS += xsk_user_helpers.o
 
-OBJS := tc_user_helpers.o
+
+DEP_DIR = deps
+LIBBPF_DIR = $(ROOT_DIR)/lib/libbpf/src
+
+DEPS := $(patsubst %,$(DEP_DIR)/%.d,$(basename $(OBJS)))
+
+# compilers (at least gcc and clang) don't create the subdirectories automatically
+$(shell mkdir -p $(dir $(DEPS)) >/dev/null)
 
 CC := gcc
 CFLAGS += -g -Wall -Wextra -Wpedantic \
@@ -19,27 +22,24 @@ CFLAGS += -g -Wall -Wextra -Wpedantic \
 CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
 CFLAGS += -O2
 
-# LIBBPF_DIR = ../libbpf/src/
-# CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
+# Because of automatic dependency generation
+CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -g
+CFLAGS += -I$(ROOT_DIR)/src/headers/
 
-# TODO : améliorer cette partie
-# TODO: Do we need to make libbpf from this make file too?
+DEPFLAGS = -MT $@ -MD -MP -MF $(DEP_DIR)/$*.Td
+
 all: $(OBJS)
 
 .PHONY: clean
-
 clean:
-	rm -f $(OBJS)
+	$(RM) -f $(OBJS)
+	$(RM) -r $(DEP_DIR)
 
-$(OBJS):%.o: %.c %.h
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-
-#TODO: add common_libbpf.h ?
-#TODO: don't forget dependencies like defines.h
-# common_user_bpf_xdp.o: common_user_bpf_xdp.c common_libbpf.h common_user_bpf_xdp.h 	
-# 	$(CC) $(CFLAGS) -c -o $@ $< 
-#common_user_bpf_socket.o: common_user_bpf_socket.c common_libbpf.h common_user_bpf_socket.h
+$(OBJS):%.o: %.c $(DEP_DIR)/%.d Makefile
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	mv -f $(DEP_DIR)/$*.Td $(DEP_DIR)/$*.d
 
 
-
+.PRECIOUS: $(DEP_DIR)/%.d
+$(DEP_DIR)/%.d: ;
+-include $(DEPS)

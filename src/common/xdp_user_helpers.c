@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <net/if.h>     /* IF_NAMESIZE */
 #include <stdlib.h>     /* exit(3) */
+#include <stdio.h> 	/* snprintf() */
 #include <string.h>     /* strerror */
 
 #include <bpf/bpf.h>
@@ -11,12 +12,177 @@
 #include <linux/err.h>
 
 #include "defines.h"
-#include "util_user_maps.h"
 #include "xdp_user_helpers.h"
 
+//TODO: remove it later.
+int verbose = 1; // Declared in defines.h
 
+/** util_user_maps.c **/
+const char *pin_basedir =  "/sys/fs/bpf";
+
+static int 
+reuse_maps(struct bpf_object *obj, const char *path)
+{
+	struct bpf_map *map;
+
+	if (!obj)
+		return -ENOENT;
+	
+	if (!path)
+		return -EINVAL;
+	
+	bpf_object__for_each_map(map, obj) {
+		int len, err;
+		int pinned_map_fd;
+		char buf[PATH_MAX];
+
+		len = snprintf(buf, PATH_MAX, "%s/%s", path, bpf_map__name(map));
+		if (len < 0) {
+			return -EINVAL;
+		} else if (len >= PATH_MAX) {
+			return -ENAMETOOLONG;
+		}
+
+		pinned_map_fd = bpf_obj_get(buf);
+		if (pinned_map_fd < 0)
+			return pinned_map_fd;
+
+		err = bpf_map__reuse_fd(map, pinned_map_fd);
+		if (err)
+			return err;
+	}
+
+	return 0;
+
+}
+
+static int 
+check_map_fd_info(const struct bpf_map_info *info,
+		      const struct bpf_map_info *exp)
+{
+	if (exp->key_size && exp->key_size != info->key_size) {
+		fprintf(stderr, "ERR: %s() "
+			"Map key size(%d) mismatch expected size(%d)\n",
+			__func__, info->key_size, exp->key_size);
+		return EXIT_FAIL;
+	}
+	if (exp->value_size && exp->value_size != info->value_size) {
+		fprintf(stderr, "ERR: %s() "
+			"Map value size(%d) mismatch expected size(%d)\n",
+			__func__, info->value_size, exp->value_size);
+		return EXIT_FAIL;
+	}
+	if (exp->max_entries && exp->max_entries != info->max_entries) {
+		fprintf(stderr, "ERR: %s() "
+			"Map max_entries(%d) mismatch expected size(%d)\n",
+			__func__, info->max_entries, exp->max_entries);
+		return EXIT_FAIL;
+	}
+	if (exp->type && exp->type  != info->type) {
+		fprintf(stderr, "ERR: %s() "
+			"Map type(%d) mismatch expected type(%d)\n",
+			__func__, info->type, exp->type);
+		return EXIT_FAIL;
+	}
+
+	return 0;
+}
+
+static int 
+open_bpf_map_file(const char *pin_dir,
+		      const char *mapname,
+		      struct bpf_map_info *info)
+{
+	char filename[PATH_MAX];
+	int err, len, fd;
+	__u32 info_len = sizeof(*info);
+
+	len = snprintf(filename, PATH_MAX, "%s/%s", pin_dir, mapname);
+	if (len < 0) {
+		fprintf(stderr, "ERR: constructing full mapname path\n");
+		return -1;
+	}
+
+	fd = bpf_obj_get(filename);
+	if (fd < 0) {
+		fprintf(stderr,
+			"WARN: Failed to open bpf map file:%s err(%d):%s\n",
+			filename, errno, strerror(errno));
+		return fd;
+	}
+
+	if (info) {
+		err = bpf_obj_get_info_by_fd(fd, info, &info_len);
+		if (err) {
+			fprintf(stderr, "ERR: %s() can't get info - %s\n",
+				__func__,  strerror(errno));
+			return EXIT_FAIL_BPF;
+		}
+	}
+
+	return fd;
+}
+
+/* Pinning maps under /sys/fs/bpf in subdir */
+static int 
+pin_maps_in_bpf_object(struct bpf_object *bpf_obj, const char *subdir)
+{
+	char map_filename[PATH_MAX]; // Warning: Variable non utilisée
+	char pin_dir[PATH_MAX];
+	int err, len;
+
+	len = snprintf(pin_dir, PATH_MAX, "%s/%s", pin_basedir, subdir);
+	if (len < 0) {
+		fprintf(stderr, "ERR: creating pin dirname\n");
+		return EXIT_FAIL_OPTION;
+	}
+
+	// TODO : évaluer l'importance de ce bloc
+
+	// len = snprintf(map_filename, PATH_MAX, "%s/%s/%s",
+	// 	       pin_basedir, subdir, map_name);
+	// if (len < 0) {
+	// 	fprintf(stderr, "ERR: creating map_name\n");
+	// 	return EXIT_FAIL_OPTION;
+	// }
+
+	// /* Existing/previous XDP prog might not have cleaned up */
+	// if (access(map_filename, F_OK ) != -1 ) {
+	// 	if (verbose)
+	// 		printf(" - Unpinning (remove) prev maps in %s/\n",
+	// 		       pin_dir);
+
+	// 	/* Basically calls unlink(3) on map_filename */
+	// 	err = bpf_object__unpin_maps(bpf_obj, pin_dir);
+	// 	if (err) {
+	// 		fprintf(stderr, "ERR: UNpinning maps in %s\n", pin_dir);
+	// 		return EXIT_FAIL_BPF;
+	// 	}
+	// }
+	// if (verbose)
+	// 	printf(" - Pinning maps in %s/\n", pin_dir);
+
+	
+	/* This will pin all maps in our bpf_object */
+	err = bpf_object__pin_maps(bpf_obj, pin_dir);
+	if (err)
+		return EXIT_FAIL_BPF;
+
+	return 0;
+}
+
+
+
+
+//TODO: Should make a generic function to load bpf object file ?
+/**
+ * Load bpf object file on XDP hook.
+ * @param filename - file's name containing XDP program
+ * @param ifindex - interface for loading XDP program
+ * @return pointer on bpf object or NULL on failure
+ **/ 
 static struct bpf_object *
-load_bpf_object_file(const char *filename, int ifindex)
+load_xdp_object_file(const char *filename, int ifindex)
 {
 	int bpf_prog_fd = -1;
 	struct bpf_object *bpf_obj;
@@ -45,9 +211,15 @@ load_bpf_object_file(const char *filename, int ifindex)
 	return bpf_obj;
 }
 
-// Pour l'instant spécifique à XDP
+//TODO: Should make a generic function ?
+/**
+ * @desc 
+ * @param file - file's name containing XDP program
+ * @param ifindex - interface for loading XDP program
+ * @return pointer on bpf object or NULL on failure
+ **/ 
 static struct bpf_object *
-open_bpf_object(const char *file, int ifindex)
+open_xdp_object(const char *file, int ifindex)
 {
 	int err;
 	struct bpf_object *obj;
@@ -91,14 +263,14 @@ open_bpf_object(const char *file, int ifindex)
 // Epingler dans un fichier
 // Pour l'instant spécifique à xdp...changer plus tard!
 static struct bpf_object *
-load_bpf_object_file_reuse_maps(const char *file,
+load_xdp_object_file_reuse_maps(const char *file,
 				int ifindex,
 				const char *pin_dir)
 {
 	int err;
 	struct bpf_object *obj;
 
-	obj = open_bpf_object(file, ifindex);
+	obj = open_xdp_object(file, ifindex);
 	if (!obj) {
 		fprintf(stderr, "ERR: failed to open object %s\n", file);
 		return NULL;
@@ -214,13 +386,33 @@ xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id)
 }
 
 struct bpf_object *
-load_bpf_and_xdp_attach(xdp_cfg_t *xdp_cfg)
+load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg, char *filename, char *ifname,
+			__u32 xdp_flags, bool reuse_maps)
 {
 	struct bpf_program *bpf_prog;
 	struct bpf_object *bpf_obj;
 	int offload_ifindex = 0;
 	int prog_fd = -1;
 	int err;
+
+	char progsec[] = "xdp_sock";
+
+	if (strlen(filename) >= BPF_FILE_SIZE  && strlen(progsec) >= BPF_PROGSEC_SIZE
+		&& strlen(ifname) >= IF_NAMESIZE) {
+			//TODO: error message
+			return NULL;
+	}
+	
+	//it's safe to call strcpy
+	strcpy(xdp_cfg->filename, filename);
+	strcpy(xdp_cfg->progsec, progsec);
+	strcpy(xdp_cfg->ifname, ifname);
+	xdp_cfg->do_unload = false;
+	xdp_cfg->reuse_maps = reuse_maps;
+	xdp_cfg->ifindex = if_nametoindex(ifname);
+	xdp_cfg->xdp_flags = xdp_flags;
+
+	
 
 	/* If flags indicate hardware offload, supply ifindex */
 	// Si le mode hardware est activé alors...
@@ -230,16 +422,17 @@ load_bpf_and_xdp_attach(xdp_cfg_t *xdp_cfg)
 	/* Load the BPF-ELF object file and get back libbpf bpf_object */
 	// Si
 	if (xdp_cfg->reuse_maps)
-		bpf_obj = load_bpf_object_file_reuse_maps(xdp_cfg->filename,
+		bpf_obj = load_xdp_object_file_reuse_maps(xdp_cfg->filename,
 							  offload_ifindex,
 							  xdp_cfg->pin_dir);
 	else
-		bpf_obj = load_bpf_object_file(xdp_cfg->filename, offload_ifindex);
+		bpf_obj = load_xdp_object_file(xdp_cfg->filename, offload_ifindex);
 
 	if (!bpf_obj)
 	{
-		fprintf(stderr, "ERR: loading file: %s\n", xdp_cfg->filename);
-		exit(EXIT_FAIL_BPF);
+		snprintf(xdp_cfg->err_buf, ERRBUF_SIZE, 
+			"ERR: loading file: %s\n", xdp_cfg->filename);
+		return NULL;
 	}
 
 	/* At this point: All XDP/BPF programs from the cfg->filename have been
@@ -258,8 +451,9 @@ load_bpf_and_xdp_attach(xdp_cfg_t *xdp_cfg)
 
 	if (!bpf_prog)
 	{
-		fprintf(stderr, "ERR: couldn't find a program in ELF section '%s'\n",xdp_cfg->progsec);
-		exit(EXIT_FAIL_BPF);
+		snprintf(xdp_cfg->err_buf, ERRBUF_SIZE ,
+			"ERR: couldn't find a program in ELF section '%s'\n", xdp_cfg->progsec);
+		return NULL;
 	}
 
 	strncpy(xdp_cfg->progsec, bpf_program__title(bpf_prog, false), sizeof(xdp_cfg->progsec));
@@ -267,8 +461,8 @@ load_bpf_and_xdp_attach(xdp_cfg_t *xdp_cfg)
 	prog_fd = bpf_program__fd(bpf_prog);
 	if (prog_fd <= 0)
 	{
-		fprintf(stderr, "ERR: bpf_program__fd failed\n");
-		exit(EXIT_FAIL_BPF);
+		snprintf(xdp_cfg->err_buf, ERRBUF_SIZE, "ERR: bpf_program__fd failed\n");
+		return NULL;
 	}
 
 	/* At this point: BPF-progs are (only) loaded by the kernel, and prog_fd
@@ -276,8 +470,10 @@ load_bpf_and_xdp_attach(xdp_cfg_t *xdp_cfg)
 	 * to a kernel hook point, in this case XDP net_device link-level hook.
 	 */
 	err = xdp_link_attach(xdp_cfg->ifindex, xdp_cfg->xdp_flags, prog_fd);
-	if (err)
-		exit(err);
+	if (err) {
+		snprintf(xdp_cfg->err_buf, ERRBUF_SIZE, "ERR: xdp_link_attach failed\n");
+		return NULL;
+	}
 
 	return bpf_obj;
 }

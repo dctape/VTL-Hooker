@@ -2,11 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h> /* bpf_get_link_xdp_id + bpf_set_link_xdp_id */
+
 #include <common/tc_user_helpers.h>
 
 #include "test_tc_helpers.h"
 
-#define BPF_TC_FILENAME        "../../bpf/bpf_tc.o"
+#define BPF_TC_FILENAME        "../../src/bpf/bpf_tc.o"
 
 void
 test_tc_egress_attach(struct tc_config *cfg)

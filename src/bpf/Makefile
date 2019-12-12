@@ -1,4 +1,4 @@
-
+ROOT_DIR = ../../
 #TODO: add hooker bpf files
 BPF_TARGETS := bpf_tc.o
 BPF_TARGETS += bpf_xdp.o
@@ -6,7 +6,7 @@ BPF_TARGETS += bpf_xdp.o
 #LIBBPF_DIR = ../libbpf/src/
 
 INCLUDE_BPF = include
-INCLUDE_VTL = ../include/vtl
+INCLUDE_VTL = $(ROOT_DIR)/include/vtl
 
 LLC ?= llc
 CLANG ?= clang

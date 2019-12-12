@@ -6,6 +6,15 @@
 #include <net/if.h>
 #include <stdbool.h> // error: unknown type name ‘bool’...Weird
 
+//TODO: put it common.h
+#define ERRBUF_SIZE     256
+//Facilite la comparaison avant strcpy
+#define BPF_FILE_SIZE	512
+#define BPF_PROGSEC_SIZE 32
+
+#ifndef PATH_MAX
+#define PATH_MAX	4096
+#endif
 
 
 //#include <bpf/libbpf.h>
@@ -14,39 +23,49 @@
 typedef struct xdp_config xdp_cfg_t;
 struct xdp_config {
 	
-	char filename[512];
-	char progsec[32];
+	char filename[BPF_FILE_SIZE];
+	char progsec[BPF_PROGSEC_SIZE];
 	char pin_dir[512];
 	bool do_unload;
 	bool reuse_maps;
-	bool use_xsksock;
-	int xsks_map_fd;
-
 	__u32 xdp_flags;
 	int ifindex;
-	//TODO: static bloc ??
-	char ifname[20];
+	char ifname[IF_NAMESIZE];
 	char ifname_buf[IF_NAMESIZE];
-
-	/* af_xdp */
-	// Not the good location
-	__u16 xsk_bind_flags;
-	int xsk_if_queue;
-	bool xsk_poll_mode;
-
-	// int redirect_ifindex;
-	// char *redirect_ifname;
-	// char redirect_ifname_buf[IF_NAMESIZE];	
-	// char src_mac[18];
-	// char dest_mac[18];
-	
+	char err_buf[ERRBUF_SIZE];
 };
 
+/**
+ * Attach bpf program to XDP hook point.
+ * @param ifindex - interface for attaching bpf program
+ * @param xdp_flags - 
+ * @param prog_fd - bpf program's file descriptor
+ * @retval 0 on success
+ * @retval != 0 on failure
+ **/ 
+int 
+xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd);
 
-int xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd);
-int xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id);
+/**
+ * Detach bpf program to XDP hook point.
+ * @param ifindex - interface for attaching bpf program
+ * @param xdp_flags - 
+ * @param prog_fd - bpf program's file descriptor
+ * @retval 0 on success
+ * @retval != 0 on failure
+ **/ 
+int 
+xdp_link_detach(int ifindex, __u32 xdp_flags, __u32 expected_prog_id);
 
-struct bpf_object *load_bpf_and_xdp_attach(xdp_cfg_t *xdp_cfg);
+/**
+ * Load bpf program in Kernel space and Attach them to 
+ * XDP hook point.
+ * @param xdp_cfg pointer on XDP configuration structure
+ * @return pointer loaded bpf object or NULL on failure
+ **/ 
+struct bpf_object *
+load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg, char *filename, char *ifname,
+			__u32 xdp_flags, bool reuse_maps);
 
 
 #endif /*__XDP_USER_HELPERS_H */
