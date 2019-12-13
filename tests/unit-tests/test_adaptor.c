@@ -97,18 +97,18 @@ test_adaptor_send(char* interface, char *target, char *dst_ip, char *src_ip)
                 return;
         }
         // Allocation
+        uint8_t *snd_data = allocate_ustrmem(VTL_DATA_SIZE);
         uint8_t *snd_packet = allocate_ustrmem (IP_MAXPACKET);
+        int *ip_flags = allocate_intmem(4);
+
         vtlhdr_t vtlh = {0};
         struct ip iphdr = {0};
 
-       
-        int ip_flags = 0;
 
-        uint8_t *snd_data = allocate_ustrmem(VTL_DATA_SIZE);
         char str[] = "TEST";
         strcpy(snd_data, str);
         ret = adaptor_send_packet(sock_fd, snd_packet, &vtlh, &iphdr,target, dst_ip, 
-                                src_ip, &ip_flags, snd_data, VTL_DATA_SIZE, err_buf);
+                                src_ip, ip_flags, snd_data, VTL_DATA_SIZE, err_buf);
         
         if (ret != 0) {
                 printf("%s", err_buf);

@@ -403,6 +403,8 @@ load_bpf_and_xdp_attach(struct xdp_config *xdp_cfg, char *filename, char *ifname
 			return NULL;
 	}
 	
+	//WARN: strcpy is not very safe, it's better to uses his self-made function
+        //...or strncpy ??
 	//it's safe to call strcpy
 	strcpy(xdp_cfg->filename, filename);
 	strcpy(xdp_cfg->progsec, progsec);

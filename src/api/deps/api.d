@@ -1,5 +1,4 @@
-test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
- /usr/include/stdio.h \
+api.o: api.c /usr/include/stdc-predef.h /usr/include/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
  /usr/include/features.h /usr/include/x86_64-linux-gnu/sys/cdefs.h \
  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
@@ -54,11 +53,7 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
  /usr/include/strings.h \
  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
- ../..//lib/libbpf/src//build/usr/include/bpf/xsk.h \
- /usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h /usr/include/stdint.h \
- /usr/include/x86_64-linux-gnu/bits/wchar.h \
- /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
- ../..//src/headers/linux/if_xdp.h /usr/include/linux/types.h \
+ ../../src/headers/linux/if_link.h /usr/include/linux/types.h \
  /usr/include/x86_64-linux-gnu/asm/types.h \
  /usr/include/asm-generic/types.h /usr/include/asm-generic/int-ll64.h \
  /usr/include/x86_64-linux-gnu/asm/bitsperlong.h \
@@ -66,15 +61,11 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
  /usr/include/linux/stddef.h \
  /usr/include/x86_64-linux-gnu/asm/posix_types.h \
  /usr/include/x86_64-linux-gnu/asm/posix_types_64.h \
- /usr/include/asm-generic/posix_types.h \
- ../..//lib/libbpf/src//build/usr/include/bpf/libbpf.h \
- /usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h \
- ../..//src/headers/linux/bpf.h /usr/include/linux/bpf_common.h \
- ../..//lib/libbpf/src//build/usr/include/bpf/libbpf_util.h \
- ../..//src/headers/linux/if_link.h /usr/include/linux/netlink.h \
+ /usr/include/asm-generic/posix_types.h /usr/include/linux/netlink.h \
  /usr/include/linux/kernel.h /usr/include/linux/sysinfo.h \
- /usr/include/linux/socket.h /usr/include/netinet/ip.h \
- /usr/include/netinet/in.h /usr/include/x86_64-linux-gnu/sys/socket.h \
+ /usr/include/linux/socket.h ../../include/vtl/vtl_macros.h \
+ ../../include/vtl/vtl_structures.h /usr/include/net/if.h \
+ /usr/include/x86_64-linux-gnu/sys/socket.h \
  /usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h \
  /usr/include/x86_64-linux-gnu/bits/socket.h \
  /usr/include/x86_64-linux-gnu/bits/socket_type.h \
@@ -84,25 +75,33 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/asm/sockios.h \
  /usr/include/asm-generic/sockios.h \
  /usr/include/x86_64-linux-gnu/bits/types/struct_osockaddr.h \
- /usr/include/x86_64-linux-gnu/bits/socket2.h \
+ /usr/include/x86_64-linux-gnu/bits/socket2.h /usr/include/netinet/ip.h \
+ /usr/include/netinet/in.h \
+ /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
  /usr/include/x86_64-linux-gnu/bits/in.h \
- ../../src/adaptor/adaptor_receive.h \
- ../../src/adaptor/../../include/vtl/vtl_structures.h \
- /usr/include/net/if.h ../../src/adaptor/../../include/vtl/vtl_macros.h \
- ../../src/adaptor/../../include/vtl/../../src/common/xdp_user_helpers.h \
- ../../src/adaptor/../../include/vtl/../../src/common/xsk_user_helpers.h \
- ../../src/adaptor/../../include/vtl/../../src/common/defines.h \
- ../../src/adaptor/../../src/common/xsk_user_helpers.h \
- ../../src/adaptor/adaptor_send.h \
- /usr/include/x86_64-linux-gnu/sys/ioctl.h \
+ /usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h /usr/include/stdint.h \
+ /usr/include/x86_64-linux-gnu/bits/wchar.h \
+ ../../include/vtl/vtl_macros.h \
+ ../../include/vtl/../../src/common/xdp_user_helpers.h \
+ /usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h \
+ ../../include/vtl/../../src/common/xsk_user_helpers.h \
+ ../../lib/libbpf/src/build/usr/include/bpf/xsk.h \
+ ../../src/headers/linux/if_xdp.h \
+ ../../lib/libbpf/src/build/usr/include/bpf/libbpf.h \
+ ../../src/headers/linux/bpf.h /usr/include/linux/bpf_common.h \
+ ../../lib/libbpf/src/build/usr/include/bpf/libbpf_util.h \
+ ../../include/vtl/../../src/common/defines.h ../common/util.h \
+ ../adaptor/adaptor_send.h /usr/include/x86_64-linux-gnu/sys/ioctl.h \
  /usr/include/x86_64-linux-gnu/bits/ioctls.h \
  /usr/include/x86_64-linux-gnu/asm/ioctls.h \
  /usr/include/asm-generic/ioctls.h /usr/include/linux/ioctl.h \
  /usr/include/x86_64-linux-gnu/asm/ioctl.h \
  /usr/include/asm-generic/ioctl.h \
  /usr/include/x86_64-linux-gnu/bits/ioctl-types.h \
- /usr/include/x86_64-linux-gnu/sys/ttydefaults.h ../../src/common/util.h \
- ../../include/vtl/vtl_macros.h
+ /usr/include/x86_64-linux-gnu/sys/ttydefaults.h \
+ ../adaptor/../../include/vtl/vtl_structures.h \
+ ../adaptor/adaptor_receive.h \
+ ../adaptor/../../src/common/xsk_user_helpers.h api.h
 
 /usr/include/stdc-predef.h:
 
@@ -224,17 +223,7 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
 
 /usr/include/x86_64-linux-gnu/bits/string_fortified.h:
 
-../..//lib/libbpf/src//build/usr/include/bpf/xsk.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h:
-
-/usr/include/stdint.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
-
-../..//src/headers/linux/if_xdp.h:
+../../src/headers/linux/if_link.h:
 
 /usr/include/linux/types.h:
 
@@ -258,18 +247,6 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
 
 /usr/include/asm-generic/posix_types.h:
 
-../..//lib/libbpf/src//build/usr/include/bpf/libbpf.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h:
-
-../..//src/headers/linux/bpf.h:
-
-/usr/include/linux/bpf_common.h:
-
-../..//lib/libbpf/src//build/usr/include/bpf/libbpf_util.h:
-
-../..//src/headers/linux/if_link.h:
-
 /usr/include/linux/netlink.h:
 
 /usr/include/linux/kernel.h:
@@ -278,9 +255,11 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
 
 /usr/include/linux/socket.h:
 
-/usr/include/netinet/ip.h:
+../../include/vtl/vtl_macros.h:
 
-/usr/include/netinet/in.h:
+../../include/vtl/vtl_structures.h:
+
+/usr/include/net/if.h:
 
 /usr/include/x86_64-linux-gnu/sys/socket.h:
 
@@ -304,25 +283,45 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
 
 /usr/include/x86_64-linux-gnu/bits/socket2.h:
 
+/usr/include/netinet/ip.h:
+
+/usr/include/netinet/in.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
+
 /usr/include/x86_64-linux-gnu/bits/in.h:
 
-../../src/adaptor/adaptor_receive.h:
+/usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h:
 
-../../src/adaptor/../../include/vtl/vtl_structures.h:
+/usr/include/stdint.h:
 
-/usr/include/net/if.h:
+/usr/include/x86_64-linux-gnu/bits/wchar.h:
 
-../../src/adaptor/../../include/vtl/vtl_macros.h:
+../../include/vtl/vtl_macros.h:
 
-../../src/adaptor/../../include/vtl/../../src/common/xdp_user_helpers.h:
+../../include/vtl/../../src/common/xdp_user_helpers.h:
 
-../../src/adaptor/../../include/vtl/../../src/common/xsk_user_helpers.h:
+/usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h:
 
-../../src/adaptor/../../include/vtl/../../src/common/defines.h:
+../../include/vtl/../../src/common/xsk_user_helpers.h:
 
-../../src/adaptor/../../src/common/xsk_user_helpers.h:
+../../lib/libbpf/src/build/usr/include/bpf/xsk.h:
 
-../../src/adaptor/adaptor_send.h:
+../../src/headers/linux/if_xdp.h:
+
+../../lib/libbpf/src/build/usr/include/bpf/libbpf.h:
+
+../../src/headers/linux/bpf.h:
+
+/usr/include/linux/bpf_common.h:
+
+../../lib/libbpf/src/build/usr/include/bpf/libbpf_util.h:
+
+../../include/vtl/../../src/common/defines.h:
+
+../common/util.h:
+
+../adaptor/adaptor_send.h:
 
 /usr/include/x86_64-linux-gnu/sys/ioctl.h:
 
@@ -342,6 +341,10 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
 
 /usr/include/x86_64-linux-gnu/sys/ttydefaults.h:
 
-../../src/common/util.h:
+../adaptor/../../include/vtl/vtl_structures.h:
 
-../../include/vtl/vtl_macros.h:
+../adaptor/adaptor_receive.h:
+
+../adaptor/../../src/common/xsk_user_helpers.h:
+
+api.h:

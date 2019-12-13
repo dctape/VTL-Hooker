@@ -85,8 +85,8 @@ bind_raw_sock_to_interface(char *interface, int sock_fd)
                 return -1;
         }
         close (sd); //Pourquoi ?
-        printf ("Index for interface %s is %i\n", 
-                        interface, ifr.ifr_ifindex); // Pourquoi ? Est-ce nécessaire ?
+        // printf ("Index for interface %s is %i\n", 
+        //                 interface, ifr.ifr_ifindex); 
 
         /* Bind socket to interface index */
         //TODO : use bind  ?

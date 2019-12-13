@@ -1,27 +1,41 @@
-
+ROOT_DIR = ../..
 OBJS := launcher.o
 
-CC ?= gcc
-CFLAGS := -g -Wall -Wextra
-CFLAGS += -Wnull-dereference -Wjump-misses-init
+DEP_DIR = deps
+LIBBPF_DIR = $(ROOT_DIR)/lib/libbpf/src
 
-LIBBPF_DIR = ../libbpf/src/
-COMMON_DIR = ../common
-CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
+DEPS := $(patsubst %,$(DEP_DIR)/%.d,$(basename $(OBJS)))
 
-#TODO: use later a more dynamic way...
-DEPS_H := $(COMMON_DIR)/tc_user_helpers.h 
-DEPS_H += $(COMMON_DIR)/xdp_user_helpers.h
+# compilers (at least gcc and clang) don't create the subdirectories automatically
+$(shell mkdir -p $(dir $(DEPS)) >/dev/null)
 
-# TODO : améliorer cette partie
-# TODO: Do we need to make libbpf from this make file too?
+CC := gcc
+CFLAGS += -g -Wall -Wextra -Wpedantic \
+          -Wformat=2 -Wno-unused-parameter -Wshadow \
+          -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+          -Wredundant-decls -Wnested-externs -Wmissing-include-dirs 
+CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
+CFLAGS += -O2
+
+# Because of automatic dependency generation
+CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -g
+CFLAGS += -I$(ROOT_DIR)/src/headers/
+
+DEPFLAGS = -MT $@ -MD -MP -MF $(DEP_DIR)/$*.Td
+
 all: $(OBJS)
 
 .PHONY: clean
-
 clean:
-	rm -f $(OBJS)
+	$(RM) -f $(OBJS)
+	$(RM) -r $(DEP_DIR)
 
-$(OBJS):%.o: %.c %.h Makefile $(DEPS_H)
-	$(CC) $(CFLAGS) -c -o $@ $<
+$(OBJS):%.o: %.c $(DEP_DIR)/%.d Makefile
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	mv -f $(DEP_DIR)/$*.Td $(DEP_DIR)/$*.d
+
+
+.PRECIOUS: $(DEP_DIR)/%.d
+$(DEP_DIR)/%.d: ;
+-include $(DEPS)
 

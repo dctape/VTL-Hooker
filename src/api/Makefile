@@ -1,49 +1,40 @@
-
+ROOT_DIR = ../..
 OBJS := api.o
 
-ADAPTOR_DIR = ../adaptor
-COMMON_DIR = ../common
-INCLUDE_DIR = ../include
-API_DIR = .
+DEP_DIR = deps
+LIBBPF_DIR = $(ROOT_DIR)/lib/libbpf/src
 
-LIBVTL_OBJS := api.o
-LIBVTL_OBJS += $(ADAPTOR_DIR)/adaptor_receive.o
-LIBVTL_OBJS += $(ADAPTOR_DIR)/adaptor_send.o
-LIBVTL_OBJS += $(COMMON_DIR)/util.o
+DEPS := $(patsubst %,$(DEP_DIR)/%.d,$(basename $(OBJS)))
 
-STATIC_LIBVTL = $(API_DIR)/libvtl.a
-
-AR = ar
+# compilers (at least gcc and clang) don't create the subdirectories automatically
+$(shell mkdir -p $(dir $(DEPS)) >/dev/null)
 
 CC := gcc
-CFLAGS := -g -Wall -Wextra
-CFLAGS += -Wnull-dereference -Wjump-misses-init
+CFLAGS += -g -Wall -Wextra -Wpedantic \
+          -Wformat=2 -Wno-unused-parameter -Wshadow \
+          -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+          -Wredundant-decls -Wnested-externs -Wmissing-include-dirs 
+CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
+CFLAGS += -O2
 
-## Pour bpf/xsk...
-LIBBPF_DIR = ../libbpf/src/
-CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
+# Because of automatic dependency generation
+CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -g
+CFLAGS += -I$(ROOT_DIR)/src/headers/
 
-#CFLAGS += -I../headers
+DEPFLAGS = -MT $@ -MD -MP -MF $(DEP_DIR)/$*.Td
 
-DEPS_H := $(ADAPTOR_DIR)/adaptor_receive.h
-DEPS_H += $(ADAPTOR_DIR)/adaptor_send.c
-DEPS_H +=$(INCLUDE_DIR)/vtl/vtl_macros.h 
-DEPS_H += $(INCLUDE_DIR)/vtl/vtl_structures.h 
-DEPS_H += $(INCLUDE_DIR)/vtl/vtl_util.h
-DEPS_H += $(COMMON_DIR)/util.h
-
-# TODO : améliorer cette partie
-# TODO: Do we need to make libbpf from this make file too?
-all: $(OBJS) $(STATIC_LIBVTL)
+all: $(OBJS)
 
 .PHONY: clean
+clean:
+	$(RM) -f $(OBJS)
+	$(RM) -r $(DEP_DIR)
 
-clean:	
-	rm -f $(STATIC_LIBVTL)
-	rm -f $(OBJS)
+$(OBJS):%.o: %.c $(DEP_DIR)/%.d Makefile
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	mv -f $(DEP_DIR)/$*.Td $(DEP_DIR)/$*.d
 
-$(OBJS): %.o: %.c %.h $(DEPS_H)
-	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(STATIC_LIBVTL): $(LIBVTL_OBJS)
-	$(AR) rcs $@ $
+.PRECIOUS: $(DEP_DIR)/%.d
+$(DEP_DIR)/%.d: ;
+-include $(DEPS)

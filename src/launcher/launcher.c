@@ -13,12 +13,13 @@
 #include "launcher.h"
 
 /** 
-  * @desc: deploy transport functions on tc hook
-  * @param: struct tc_config *cfg - configure tc attachment
-  * @param: char *tf_file - bpf file to load in kernel
-  * @param: char *interface - interface where to load tf
-  * @param: int flags -        
-  * @return: 
+  * Deploy transport functions on tc hook.
+  * @param tc_config *cfg - configure tc attachment
+  * @param tf_file - bpf file to load in kernel
+  * @param interface - interface where to load tf
+  * @param  flags -        
+  * @retval 0 on success
+  * @retval -1 on failure 
   * 
 */ 
 int
@@ -28,10 +29,9 @@ launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int
         
         //TODO : change this part later... remove egress
         if (!(ifindex)) { 
-                        fprintf(stderr,
-                                "ERR: --egress \"%s\" not real dev\n",
+                        snprintf(cfg->err_buf, ERRBUF_SIZE, "ERR: --egress \"%s\" not real dev\n",
                                         interface);
-                        return EXIT_FAILURE;
+                        return -1;
         }
 
         //WARN: strcpy is not very safe, it's better to uses his self-made function
@@ -54,13 +54,15 @@ launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int
                 case TC_EGRESS_ATTACH:
                        //TODO: return code
                         if (tc_egress_attach_bpf(cfg)) {
-                                fprintf(stderr, "ERR: TC attach failed\n");
-                                return EXIT_FAILURE;
+                                snprintf(cfg->err_buf, ERRBUF_SIZE, "ERR: TC attach failed\n");
+                                return -1;
                         }
                         break; 
 
                 default:
-                        fprintf(stderr, "ERR: launcher_deploy_tc_tf() failed, flags unknown!\n");
+                        snprintf(cfg->err_buf, ERRBUF_SIZE, 
+                        "ERR: launcher_deploy_tc_tf() failed, flags unknown!\n");
+                        return -1;
                         break;
         }
 
@@ -68,10 +70,11 @@ launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int
 }
 
 /** 
-  * @desc: remove transport functions on tc hook
-  * @param: struct tc_config *cfg - 
-  * @param: int flags -        
-  * @return: 
+  * Remove transport functions on tc hook.
+  * @param struct tc_config *cfg - 
+  * @param flags -        
+  * @retval 0 on success
+  * @retval -1 on failure
   * 
 */ 
 int
@@ -82,10 +85,10 @@ launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
         
         //TODO : change this part later... remove egress
         if (!(ifindex)) { 
-                        fprintf(stderr,
+                        snprintf(cfg->err_buf, ERRBUF_SIZE,
                                 "ERR: --egress \"%s\" not real dev\n",
                                         interface);
-                        return EXIT_FAILURE;
+                        return -1;
         }
 
         //snprintf(cfg->filename, sizeof(cfg->filename), "%s", tf_file);
@@ -105,9 +108,10 @@ launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
                         break;
                 
                 default:
-                        fprintf(stderr, "ERR: launcher_remove_tc_tf() failed, flags unknown!\n");
-                        break;
-                
+                        snprintf(cfg->err_buf, ERRBUF_SIZE,
+                                "ERR: launcher_remove_tc_tf() failed, flags unknown!\n");
+                                return -1;
+                        break;               
                 
         }
 
@@ -116,89 +120,64 @@ launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
 
 
 /** 
-  * @desc: deploy transport functions on xdp hook
-  * @param: struct xdp_config *cfg - configure xdp attachment
-  * @param: char *tf_file - bpf file to load in kernel
-  * @param: char *interface - NIC where to load tf        
-  * @return: 
+  * Deploy transport functions on xdp hook.
+  * @param cfg - configure xdp attachment
+  * @param tf_file - bpf file to load in kernel
+  * @param interface - NIC where to load tf        
+  * @retval 0 on success
+  * @retval -1 on failure
   * 
 */ 
 int 
-launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *interface, int flags)
+launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname, 
+                        __u32 xdp_flags)
 {       
 
         struct bpf_object *bpf_obj = NULL;
 
-        if (tf_file[0] == 0)
-                return EXIT_FAIL;
-
-        //TODO: 2nd test on tf_file - verify that ebpf prog type is XDP
-
-        //WARN: strcpy is not very safe, it's better to uses his self-made function
-        //...or strncpy ??
-        strcpy(cfg->filename, tf_file);
-        strcpy(cfg->progsec, "xdp_sock");
-        
-        //TODO: it seems not necessary
-        cfg->do_unload = false;
-        
-        //TODO: redundant, find a better way...
-        cfg->ifindex = if_nametoindex(interface);
-        strcpy(cfg->ifname, interface);
-        if (cfg->ifindex == -1) {
-		fprintf(stderr, "ERROR: Required option --dev missing\n\n");
-		return EXIT_FAIL_OPTION;
-	}
-
-        // XDP Flags
-        cfg->xdp_flags = flags;
-
-        bpf_obj = load_bpf_and_xdp_attach(cfg);
-	if (!bpf_obj) {
-		/* Error handling done in load_bpf_and_xdp_attach() */
-		exit(EXIT_FAILURE);
-	}
-
-        //TODO: Not the good location
-        if (cfg->use_xsksock == true) {
-
-                struct bpf_map *map = NULL;
-                map = bpf_object__find_map_by_name(bpf_obj, "xsks_map");
-                cfg->xsks_map_fd = bpf_map__fd(map);
-                if (cfg->xsks_map_fd < 0) {
-                        fprintf(stderr, "ERROR: no xsks map found: %s\n",
-                                strerror(cfg->xsks_map_fd));
-                        exit(EXIT_FAILURE);
-	        }
+        if (tf_file[0] == 0) {
+                snprintf(cfg->err_buf, ERRBUF_SIZE, "ERR: bad tf_file\n");
+                return -1;
         }
+                
+        //TODO: 2nd test on tf_file - verify that ebpf prog type is XDP
+        bool reuse_maps = false;
+        bpf_obj = load_bpf_and_xdp_attach(cfg, tf_file, ifname, xdp_flags, reuse_maps);
+	if (bpf_obj == NULL) {
+		/* Error handling done in load_bpf_and_xdp_attach */
+		return -1;
+	}
+
+        struct bpf_map *map = NULL;
+        map = bpf_object__find_map_by_name(bpf_obj, "xsks_map");
+        int xsks_map_fd = bpf_map__fd(map);
+        if (xsks_map_fd < 0) {
+                snprintf(cfg->err_buf, ERRBUF_SIZE, "ERR: no xsks map found: %s\n",
+                        strerror(xsks_map_fd));
+                return -1;
+	}
 
         return 0;
 }
 
 /** 
-  * @desc: remove transport functions on xdp hook
-  * @param: struct xdp_config *cfg -
-  * @param: char *interface - NIC where to remove tf
-  * @param: flags -         
-  * @return: 
+  * Remove transport functions on xdp hook.
+  * @param cfg -
+  * @param interface - NIC where to remove tf
+  * @param flags -         
+  * @retval 
   * 
 */
 int
-launcher_remove_xdp_tf(struct xdp_config *cfg, char *interface, int flags)
+launcher_remove_xdp_tf(struct xdp_config *cfg)
 {
-        //TODO: redundant, find a better way...
-        cfg->ifindex = if_nametoindex(interface);
-        strcpy(cfg->ifname, interface);
-        if (cfg->ifindex == -1) {
-		fprintf(stderr, "ERROR: Required option --dev missing\n\n");
-		return EXIT_FAIL_OPTION;
-	}
-        // XDP Flags
-        cfg->xdp_flags = flags;
-         
-        xdp_link_detach(cfg->ifindex, cfg->xdp_flags, 0);
+        int ret;
+        ret = xdp_link_detach(cfg->ifindex, cfg->xdp_flags, 0);
+        if (ret != 0) {
+                // Error message ?
+                return -1;
+        }
         return 0;
-
 }
 
 
