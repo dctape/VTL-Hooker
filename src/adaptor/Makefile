@@ -1,41 +1,46 @@
+ROOT_DIR = ../..
 
-#OBJS := adaptor_receive.o
-#OBJS += adaptor_send.o
-RCV_OBJ = adaptor_receive.o
-SND_OBJ = adaptor_send.o
+OBJS := adaptor_receive.o
+OBJS += adaptor_send.o
 
-COMMON_DIR = ../common
-INCLUDE_DIR = ../include
+DEP_DIR = deps
+LIBBPF_DIR = $(ROOT_DIR)/lib/libbpf/src
 
-CC ?= gcc
-CFLAGS := -g -Wall -Wextra
-CFLAGS += -Wnull-dereference -Wjump-misses-init
+DEPS := $(patsubst %,$(DEP_DIR)/%.d,$(basename $(OBJS)))
 
-## Ajouter libbpf à cause de bpf/xsk.h
-LIBBPF_DIR = ../libbpf/src/
-CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/  -I../headers
-#CFLAGS += -I../headers
+# compilers (at least gcc and clang) don't create the subdirectories automatically
+$(shell mkdir -p $(dir $(DEPS)) >/dev/null)
 
-COMMON_DEPS_H := $(INCLUDE_DIR)/vtl/vtl_macros.h
-COMMON_DEPS_H := $(INCLUDE_DIR)/vtl/vtl_structures.h
+CC := gcc
+CFLAGS += -g -Wall -Wextra -Wpedantic \
+          -Wformat=2 -Wno-unused-parameter -Wshadow \
+          -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+          -Wredundant-decls -Wnested-externs -Wmissing-include-dirs 
+CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
+CFLAGS += -O2
 
-RCV_DEPS_H := $(COMMON_DIR)/xsk_user_helpers.h
-SND_DEPS_H := $(COMMON_DIR)/util.h
+# Because of automatic dependency generation
+CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -g
+CFLAGS += -I$(ROOT_DIR)/src/headers/
+
+DEPFLAGS = -MT $@ -MD -MP -MF $(DEP_DIR)/$*.Td
 
 
 
 # TODO : améliorer cette partie
 # TODO: Do we need to make libbpf from this make file too?
-all: $(RCV_OBJ) $(SND_OBJ)
+all: $(OBJS)
 
 .PHONY: clean
-
 clean:
-	rm -f $(RCV_OBJ) 
-	rm -f $(SND_OBJ)
+	$(RM) -f $(OBJS)
+	$(RM) -r $(DEP_DIR)
 
-$(RCV_OBJ): %.o: %.c %.h Makefile $(RCV_DEPS_H) $(COMMON_DEPS_H)
-	$(CC) $(CFLAGS) -c -o $@ $<
+$(OBJS):%.o: %.c $(DEP_DIR)/%.d Makefile
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	mv -f $(DEP_DIR)/$*.Td $(DEP_DIR)/$*.d
 
-$(SND_OBJ): %.o: %.c %.h Makefile $(SND_DEPS_H) $(COMMON_DEPS_H)
-	$(CC) $(CFLAGS) -c -o $@ $<
+
+.PRECIOUS: $(DEP_DIR)/%.d
+$(DEP_DIR)/%.d: ;
+-include $(DEPS)

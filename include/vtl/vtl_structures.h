@@ -7,8 +7,9 @@
 #include <netinet/ip.h>       // struct ip and IP_MAXPACKET (which is 65535)
 #include <stdint.h>
 
-#include "../../common/xdp_user_helpers.h"
-#include "../../common/xsk_user_helpers.h"
+//TODO: Break dependency with common folder.
+#include "../../src/common/xdp_user_helpers.h"
+#include "../../src/common/xsk_user_helpers.h"
 
 /* En-tête de paquet vtl */
 typedef struct vtl_header vtlhdr_t;
@@ -41,7 +42,7 @@ struct vtl_metadata {
 
         int af_inet_sock;
         struct xsk_socket_info *xsk_socket;
-        xdp_cfg_t *xdp_cfg;
+        struct xdp_cfg *xdp_cfg;
         
         bool xsk_poll_mode;
         uint8_t *snd_packet;

@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-// #include <bpf/xsk.h> // ajouter libbpf lors de la compilation
+#include <bpf/xsk.h> // ajouter libbpf lors de la compilation
 
 #include <sys/resource.h>
 
@@ -19,21 +19,21 @@
 //WARN: Rentre en conflit avec netinet/ip.h
 //#include <linux/ip.h>
 
-#include "../include/vtl/vtl_macros.h"
-#include "../include/vtl/vtl_structures.h"
+#include "../../include/vtl/vtl_macros.h"
+#include "../../include/vtl/vtl_structures.h"
 
-#include "../common/xsk_user_helpers.h"
+#include "../../src/common/xsk_user_helpers.h"
 #include "adaptor_receive.h"
 
 #define RX_BATCH_SIZE      		64
 
 struct xsk_socket_info *
 adaptor_create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
-			int xsk_if_queue, char *err_buf)
+			int xsk_if_queue, struct xsk_umem_info *umem, char *err_buf)
 {
       void *packet_buffer;
       uint64_t packet_buffer_size;
-      struct xsk_umem_info *umem;
+      //struct xsk_umem_info *umem;
 
       struct xsk_socket_info *xsk_socket = NULL;
 
@@ -82,6 +82,7 @@ adaptor_create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 
 	/* Cleanup */
 bad:
+	//TODO:
 	// xsk_socket__delete(xsk_socket->xsk); // xsk_socket__delete => bpf/xsk
 	// xsk_umem__delete(umem->umem); // xsk_umem__delete => bpf/xsk
 	return NULL;
@@ -168,25 +169,26 @@ handle_receive_packets(struct xsk_socket_info *xsk, uint8_t *rcv_data, size_t *r
 
 //TODO: Revoir le code de retour
 void 
-adaptor_rcv_data(vtl_md_t *vtl_md)
+adaptor_rcv_data(struct xsk_socket_info *xsk_socket, uint8_t *rcv_data,
+		 size_t rcv_datalen, bool xsk_poll_mode)
 {	
 	// Pas trop bien compris...
 	struct pollfd fds[2];
 	int ret, nfds = 1;
 
 	memset(fds, 0, sizeof(fds));
-	fds[0].fd = xsk_socket__fd(vtl_md->xsk_socket->xsk);
+	fds[0].fd = xsk_socket__fd(xsk_socket->xsk);
 	fds[0].events = POLLIN;
 
 	//TODO: revenir sur le xsk_poll_mode
-	if (vtl_md->xsk_poll_mode){
+	if (xsk_poll_mode){
 	
 		ret = poll(fds, nfds, -1);
 		if (ret <= 0 || ret > 1)
 			return; 
 	}
 		
-	handle_receive_packets(vtl_md->xsk_socket, vtl_md->rcv_data, &vtl_md->rcv_datalen);
+	handle_receive_packets(xsk_socket, rcv_data, &rcv_datalen);
 	
 }
 

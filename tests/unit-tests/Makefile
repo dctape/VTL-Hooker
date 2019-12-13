@@ -2,11 +2,13 @@ ROOT_DIR = ../../
 
 TARGETS := test_tc_helpers
 TARGETS += test_xdp_helpers
+TARGETS += test_adaptor
 
 
 OBJ_DIR = objs
 DEP_DIR = deps
 
+ADAPTOR_DIR = $(ROOT_DIR)/src/adaptor
 COMMON_DIR = $(ROOT_DIR)/src/common/
 LIBBPF_DIR = $(ROOT_DIR)/lib/libbpf/src/
 
@@ -34,6 +36,8 @@ DEPFLAGS = -MT $@ -MD -MP -MF $(DEP_DIR)/$*.Td
 
 COMMON_OBJS := $(COMMON_DIR)/tc_user_helpers.o
 COMMON_OBJS += $(COMMON_DIR)/xdp_user_helpers.o
+COMMON_OBJS += $(COMMON_DIR)/xsk_user_helpers.o
+ADAPTOR_OBJS := $(ADAPTOR_DIR)/adaptor_receive.o
 
 LDFLAGS ?= -L$(LIBBPF_DIR) 
 
@@ -42,7 +46,7 @@ LIBS = -l:libbpf.a -lelf
 all: $(TARGETS)
 
 $(TARGETS): %: %.c $(COMMON_OBJS) $(DEP_DIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(COMMON_OBJS) $< $(LIBS)
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(COMMON_OBJS) $(ADAPTOR_OBJS) $< $(LIBS)
 	mv -f $(DEP_DIR)/$*.Td $(DEP_DIR)/$*.d
 
 .PHONY: clean
