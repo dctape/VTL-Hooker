@@ -34,10 +34,13 @@ CFLAGS += -I$(ROOT_DIR)/src
 # flags required for dependency generation; passed to compilers
 DEPFLAGS = -MT $@ -MD -MP -MF $(DEP_DIR)/$*.Td
 
-COMMON_OBJS := $(COMMON_DIR)/tc_user_helpers.o
+COMMON_OBJS := $(COMMON_DIR)/util.o
+COMMON_OBJS += $(COMMON_DIR)/tc_user_helpers.o
 COMMON_OBJS += $(COMMON_DIR)/xdp_user_helpers.o
 COMMON_OBJS += $(COMMON_DIR)/xsk_user_helpers.o
+
 ADAPTOR_OBJS := $(ADAPTOR_DIR)/adaptor_receive.o
+ADAPTOR_OBJS += $(ADAPTOR_DIR)/adaptor_send.o
 
 LDFLAGS ?= -L$(LIBBPF_DIR) 
 

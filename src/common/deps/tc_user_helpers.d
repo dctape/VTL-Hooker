@@ -1,4 +1,4 @@
-test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
+tc_user_helpers.o: tc_user_helpers.c /usr/include/stdc-predef.h \
  /usr/include/stdio.h \
  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
  /usr/include/features.h /usr/include/x86_64-linux-gnu/sys/cdefs.h \
@@ -53,28 +53,8 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h \
  /usr/include/strings.h \
  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
- /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
- ../..//lib/libbpf/src//build/usr/include/bpf/xsk.h \
- /usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h /usr/include/stdint.h \
- /usr/include/x86_64-linux-gnu/bits/wchar.h \
- /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
- ../..//src/headers/linux/if_xdp.h /usr/include/linux/types.h \
- /usr/include/x86_64-linux-gnu/asm/types.h \
- /usr/include/asm-generic/types.h /usr/include/asm-generic/int-ll64.h \
- /usr/include/x86_64-linux-gnu/asm/bitsperlong.h \
- /usr/include/asm-generic/bitsperlong.h /usr/include/linux/posix_types.h \
- /usr/include/linux/stddef.h \
- /usr/include/x86_64-linux-gnu/asm/posix_types.h \
- /usr/include/x86_64-linux-gnu/asm/posix_types_64.h \
- /usr/include/asm-generic/posix_types.h \
- ../..//lib/libbpf/src//build/usr/include/bpf/libbpf.h \
- /usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h \
- ../..//src/headers/linux/bpf.h /usr/include/linux/bpf_common.h \
- ../..//lib/libbpf/src//build/usr/include/bpf/libbpf_util.h \
- ../..//src/headers/linux/if_link.h /usr/include/linux/netlink.h \
- /usr/include/linux/kernel.h /usr/include/linux/sysinfo.h \
- /usr/include/linux/socket.h /usr/include/netinet/ip.h \
- /usr/include/netinet/in.h /usr/include/x86_64-linux-gnu/sys/socket.h \
+ /usr/include/x86_64-linux-gnu/bits/string_fortified.h defines.h \
+ /usr/include/net/if.h /usr/include/x86_64-linux-gnu/sys/socket.h \
  /usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h \
  /usr/include/x86_64-linux-gnu/bits/socket.h \
  /usr/include/x86_64-linux-gnu/bits/socket_type.h \
@@ -84,25 +64,16 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
  /usr/include/x86_64-linux-gnu/asm/sockios.h \
  /usr/include/asm-generic/sockios.h \
  /usr/include/x86_64-linux-gnu/bits/types/struct_osockaddr.h \
- /usr/include/x86_64-linux-gnu/bits/socket2.h \
- /usr/include/x86_64-linux-gnu/bits/in.h \
- ../../src/adaptor/adaptor_receive.h \
- ../../src/adaptor/../../include/vtl/vtl_structures.h \
- /usr/include/net/if.h \
- ../../src/adaptor/../../include/vtl/../../src/common/xdp_user_helpers.h \
- ../../src/adaptor/../../include/vtl/../../src/common/xsk_user_helpers.h \
- ../../src/adaptor/../../include/vtl/../../src/common/defines.h \
- ../../src/adaptor/../../src/common/xsk_user_helpers.h \
- ../../src/adaptor/adaptor_send.h \
- /usr/include/x86_64-linux-gnu/sys/ioctl.h \
- /usr/include/x86_64-linux-gnu/bits/ioctls.h \
- /usr/include/x86_64-linux-gnu/asm/ioctls.h \
- /usr/include/asm-generic/ioctls.h /usr/include/linux/ioctl.h \
- /usr/include/x86_64-linux-gnu/asm/ioctl.h \
- /usr/include/asm-generic/ioctl.h \
- /usr/include/x86_64-linux-gnu/bits/ioctl-types.h \
- /usr/include/x86_64-linux-gnu/sys/ttydefaults.h ../../src/common/util.h \
- ../../include/vtl/vtl_macros.h
+ /usr/include/x86_64-linux-gnu/bits/socket2.h /usr/include/linux/types.h \
+ /usr/include/x86_64-linux-gnu/asm/types.h \
+ /usr/include/asm-generic/types.h /usr/include/asm-generic/int-ll64.h \
+ /usr/include/x86_64-linux-gnu/asm/bitsperlong.h \
+ /usr/include/asm-generic/bitsperlong.h /usr/include/linux/posix_types.h \
+ /usr/include/linux/stddef.h \
+ /usr/include/x86_64-linux-gnu/asm/posix_types.h \
+ /usr/include/x86_64-linux-gnu/asm/posix_types_64.h \
+ /usr/include/asm-generic/posix_types.h \
+ /usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h tc_user_helpers.h
 
 /usr/include/stdc-predef.h:
 
@@ -224,63 +195,9 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
 
 /usr/include/x86_64-linux-gnu/bits/string_fortified.h:
 
-../..//lib/libbpf/src//build/usr/include/bpf/xsk.h:
+defines.h:
 
-/usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h:
-
-/usr/include/stdint.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
-
-../..//src/headers/linux/if_xdp.h:
-
-/usr/include/linux/types.h:
-
-/usr/include/x86_64-linux-gnu/asm/types.h:
-
-/usr/include/asm-generic/types.h:
-
-/usr/include/asm-generic/int-ll64.h:
-
-/usr/include/x86_64-linux-gnu/asm/bitsperlong.h:
-
-/usr/include/asm-generic/bitsperlong.h:
-
-/usr/include/linux/posix_types.h:
-
-/usr/include/linux/stddef.h:
-
-/usr/include/x86_64-linux-gnu/asm/posix_types.h:
-
-/usr/include/x86_64-linux-gnu/asm/posix_types_64.h:
-
-/usr/include/asm-generic/posix_types.h:
-
-../..//lib/libbpf/src//build/usr/include/bpf/libbpf.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h:
-
-../..//src/headers/linux/bpf.h:
-
-/usr/include/linux/bpf_common.h:
-
-../..//lib/libbpf/src//build/usr/include/bpf/libbpf_util.h:
-
-../..//src/headers/linux/if_link.h:
-
-/usr/include/linux/netlink.h:
-
-/usr/include/linux/kernel.h:
-
-/usr/include/linux/sysinfo.h:
-
-/usr/include/linux/socket.h:
-
-/usr/include/netinet/ip.h:
-
-/usr/include/netinet/in.h:
+/usr/include/net/if.h:
 
 /usr/include/x86_64-linux-gnu/sys/socket.h:
 
@@ -304,42 +221,28 @@ test_adaptor: test_adaptor.c /usr/include/stdc-predef.h \
 
 /usr/include/x86_64-linux-gnu/bits/socket2.h:
 
-/usr/include/x86_64-linux-gnu/bits/in.h:
+/usr/include/linux/types.h:
 
-../../src/adaptor/adaptor_receive.h:
+/usr/include/x86_64-linux-gnu/asm/types.h:
 
-../../src/adaptor/../../include/vtl/vtl_structures.h:
+/usr/include/asm-generic/types.h:
 
-/usr/include/net/if.h:
+/usr/include/asm-generic/int-ll64.h:
 
-../../src/adaptor/../../include/vtl/../../src/common/xdp_user_helpers.h:
+/usr/include/x86_64-linux-gnu/asm/bitsperlong.h:
 
-../../src/adaptor/../../include/vtl/../../src/common/xsk_user_helpers.h:
+/usr/include/asm-generic/bitsperlong.h:
 
-../../src/adaptor/../../include/vtl/../../src/common/defines.h:
+/usr/include/linux/posix_types.h:
 
-../../src/adaptor/../../src/common/xsk_user_helpers.h:
+/usr/include/linux/stddef.h:
 
-../../src/adaptor/adaptor_send.h:
+/usr/include/x86_64-linux-gnu/asm/posix_types.h:
 
-/usr/include/x86_64-linux-gnu/sys/ioctl.h:
+/usr/include/x86_64-linux-gnu/asm/posix_types_64.h:
 
-/usr/include/x86_64-linux-gnu/bits/ioctls.h:
+/usr/include/asm-generic/posix_types.h:
 
-/usr/include/x86_64-linux-gnu/asm/ioctls.h:
+/usr/lib/gcc/x86_64-linux-gnu/7/include/stdbool.h:
 
-/usr/include/asm-generic/ioctls.h:
-
-/usr/include/linux/ioctl.h:
-
-/usr/include/x86_64-linux-gnu/asm/ioctl.h:
-
-/usr/include/asm-generic/ioctl.h:
-
-/usr/include/x86_64-linux-gnu/bits/ioctl-types.h:
-
-/usr/include/x86_64-linux-gnu/sys/ttydefaults.h:
-
-../../src/common/util.h:
-
-../../include/vtl/vtl_macros.h:
+tc_user_helpers.h:

@@ -12,7 +12,7 @@
 /**
  * 
  * @param
- * @retval 0 on success
+ * @retval sockfd on success
  * @retval -1 on failure
  **/ 
 int 
