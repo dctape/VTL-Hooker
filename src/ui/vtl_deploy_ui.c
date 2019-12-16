@@ -13,6 +13,9 @@
 #define BPF_TC_FILENAME         "../bpf/bpf_tc.o"
 #define BPF_XDP_FILENAME        "../bpf/bpf_xdp.o"
 
+#define INPUT_MODE             0x1
+#define OUTPUT_MODE              0x2     
+
 int menu_start(void)
 {
         int choice;
@@ -78,57 +81,79 @@ void select_interface(char *interface)
         strcpy(interface, devs[n]);
 }
 
-void deploy_tf(int mode)
+int deploy_tf(int mode)
 {
         int ret; //use it
         char interface[20];
+        
+        char xdp_file[] = BPF_XDP_FILENAME; 
+        int xdp_flags = 0;
+        struct xdp_config xdp_cfg = {0};
+
+        char tc_file[] = BPF_TC_FILENAME;
+        struct tc_config tc_cfg = {0};
+
         switch (mode)
         {
-        case 1 /* Input mode = xdp */:
+        case INPUT_MODE /* xdp */:
+        
+                select_interface(interface);               
 
-                /* select interface */
-                select_interface(interface);
-                
-                /* deploy tf on selected interface */
                 printf("\n\nDeploying TF on %s interface in input mode...", interface);
-                struct xdp_config xdp_cfg = {};
-                int xdp_flags;
+
                 xdp_flags &= ~XDP_FLAGS_MODES;   /* Clear flags */
-                xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */
-                ret = launcher_deploy_xdp_tf(&xdp_cfg, BPF_XDP_FILENAME, interface,
+                xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */             
+                ret = launcher_deploy_xdp_tf(&xdp_cfg, xdp_file, interface,
                                        xdp_flags);
+                if (ret < 0) {
+                        fprintf(stderr, "%s", xdp_cfg.err_buf);
+                        fprintf(stderr, "ERR: launcher_deploy_xdp_tf failed\n");
+                        return -1;
+                }
                 printf("Success\n");
 
                 break;
-
+        
         case 2 /* Output mode = tc */:
-                /* select interface */
+        {
                 select_interface(interface);
-
                 /* deploy tf on selected interface */
                 printf("\n\nDeploying TF on %s interface in output mode...", interface);
-                struct tc_config tc_cfg = {};
-                ret = launcher_deploy_tc_tf(&tc_cfg, BPF_TC_FILENAME, interface,
+                
+                ret = launcher_deploy_tc_tf(&tc_cfg, tc_file, interface,
                                     TC_EGRESS_ATTACH);
-                printf("Success\n");
+                if (ret < 0) {
+                        fprintf(stderr, "%s", tc_cfg.err_buf);
+                        fprintf(stderr, "ERR: launcher_deploy_tc_tf failed\n");
+                        return -1;
+                }
 
+                printf("Success\n");
                 break;
+        }
+   
+                
 
         default:
+                fprintf(stderr, "ERR: unknown mode\n");
+                return -1;
                 break;
         }
 
-        return;
+        return 0;
 }
 
-void remove_tf(int mode)
+int remove_tf(int mode)
 {
         int ret; //use it
         char interface[20];
-    
+        
+        int xdp_flags = 0;
+        struct tc_config tc_cfg = {0};
+
         switch (mode)
         {
-        case 1 /* Input mode = xdp */:
+        case INPUT_MODE /* xdp */:
                 /* code */
 
                 /* select interface */
@@ -136,43 +161,54 @@ void remove_tf(int mode)
 
                 /* Remove tf on selected interface */
                 printf("\n\nDeploying TF on %s interface in input mode...", interface);
-                struct xdp_config xdp_cfg = {};
-                int xdp_flags;
+                
                 xdp_flags &= ~XDP_FLAGS_MODES;   /* Clear flags */
                 xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */
-                ret = launcher_remove_xdp_tf(&xdp_cfg, interface, xdp_flags);
+                ret = launcher_remove_xdp_tf(interface, xdp_flags);
+                if (ret < 0) {
+                        fprintf(stderr, "ERR: launcher_remove_xdp_tf failed\n");
+                        return -1;
+                }
 
                 printf("Success\n");
 
 
                 break;
         
-        case 2 /* Output mode = tc */:
+        case OUTPUT_MODE /* tc */:
 
                 /* select interface */
                 select_interface(interface);
 
                 /* Remove tf on selected interface */
-                printf("\n\nRemoving TF on %s interface in output mode...", interface);
-                struct tc_config tc_cfg = {};
+                printf("\n\nRemoving TF on %s interface in output mode...", interface);              
                 ret = launcher_remove_tc_tf(&tc_cfg, interface, TC_EGRESS_ATTACH);
+                if (ret < 0) {
+                        fprintf(stderr, "ERR: launcher_remove_tc_tf failed\n");
+                        return -1;
+                }
 
                 printf("Success\n");
                 break;
 
         default:
+                fprintf(stderr, "ERR: unknown mode\n");
+                return -1;
                 break;
         }
 
+        return 0;
+
 }
 
-void clear_screen()
+void clear_screen(void)
 {
     //system("cls||clear");
     system("clear");
 }
 
-int main()
+
+int main(int argc, char const *argv[])
 {
         int ret;
         int c;
@@ -199,7 +235,11 @@ int main()
                         //TODO: Display TF list
                         mode = menu_mode();
     
-                        deploy_tf(mode);
+                        ret = deploy_tf(mode);
+                        if (ret < 0) {
+                                menu_choice = 3;
+                                break;
+                        }
 
                         /* clear input buffer */
                         while ((c = getchar()) != '\n' && c != EOF) { }
@@ -212,7 +252,11 @@ int main()
                         break;
                 case 2 /* Remove TF */:
                         mode = menu_mode();
-                        remove_tf(mode);
+                        ret = remove_tf(mode);
+                        if (ret < 0) {
+                                menu_choice = 3;
+                                break;
+                        }
 
                         /* clear input buffer */
                         while ((c = getchar()) != '\n' && c != EOF) { } 

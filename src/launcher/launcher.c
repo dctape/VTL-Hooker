@@ -77,6 +77,7 @@ launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int
   * @retval -1 on failure
   * 
 */ 
+//TODO: make it more simple in removing struct tc_config
 int
 launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
 {       
@@ -127,7 +128,8 @@ launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
   * @retval 0 on success
   * @retval -1 on failure
   * 
-*/ 
+*/
+// TODO: put err_buf as parameter 
 int 
 launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname, 
                         __u32 xdp_flags)
@@ -169,10 +171,11 @@ launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname,
   * 
 */
 int
-launcher_remove_xdp_tf(struct xdp_config *cfg)
+launcher_remove_xdp_tf(char *ifname, __u32 xdp_flags)
 {
         int ret;
-        ret = xdp_link_detach(cfg->ifindex, cfg->xdp_flags, 0);
+        int ifindex = if_nametoindex(ifname);
+        ret = xdp_link_detach(ifindex, xdp_flags, 0);
         if (ret != 0) {
                 // Error message ?
                 return -1;

@@ -21,6 +21,6 @@ int
 launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname, 
                         __u32 xdp_flags);
 int 
-launcher_remove_xdp_tf(struct xdp_config *cfg);
+launcher_remove_xdp_tf(char *ifname, __u32 xdp_flags);
 
 #endif /* __LAUNCHER_H */
