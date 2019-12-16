@@ -1,105 +1,100 @@
 ROOT_DIR = .
 
 BIN_DIR = $(ROOT_DIR)/bin
-LIBTOOLS = $(ROOT_DIR)/lib
 SRC_DIR = $(ROOT_DIR)/src
+LIBTOOLS = $(ROOT_DIR)/lib
+BPFPROG_DIR = $(ROOT_DIR)/src/bpf
+LIBBPF_DIR = $(ROOT_DIR)/lib/libbpf/src/
+
 
 MODULES := $(SRC_DIR)/api
 MODULES += $(SRC_DIR)/adaptor
+MODULES += $(SRC_DIR)/common
 MODULES += $(SRC_DIR)/launcher
 MODULES += $(SRC_DIR)/ui
 
+BIN_CLEAN = $(addsuffix _clean, $(BIN_DIR))
 MODULES_CLEAN = $(addsuffix _clean, $(MODULES))
 LIBTOOLS_CLEAN = $(addsuffix _clean, $(LIBTOOLS))
+BPFPROG_CLEAN = $(addsuffix _clean, $(BPFPROG_DIR))
 
-all: $(MODULES)
+STATIC_LIBVTL = $(BIN_DIR)/libvtl.a
+
+LIBVTL_OBJS := $(SRC_DIR)/api/*.o
+LIBVTL_OBJS += $(SRC_DIR)/adaptor/*.o
+LIBVTL_OBJS += $(SRC_DIR)/common/*.o
+LIBVTL_OBJS += $(SRC_DIR)/launcher/*.o
+
+VTL_UI = $(BIN_DIR)/vtl_ui
+
+
+CC := gcc
+CFLAGS += -g -Wall -Wextra -Wpedantic \
+          -Wformat=2 -Wno-unused-parameter -Wshadow \
+          -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+          -Wredundant-decls -Wnested-externs -Wmissing-include-dirs 
+CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
+CFLAGS += -O2
+CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -g
+CFLAGS += -I$(ROOT_DIR)/src/headers/
+
+ARFLAGS = rcs
+LDFLAGS ?= -L$(LIBBPF_DIR) 
+
+LIBS := -l:libbpf.a -lelf 
+LIBS += -lpcap
+
+all: build
 	@echo "Build finished."
 
-.PHONY: clean
-clean: $(MODULES_CLEAN)
+.PHONY: clean 
+clean: clean-bin clean-modules clean-bpfprog clean-libtools
 	
-$(LIBTOOLS_CLEAN) $(MODULES_CLEAN):
-	$(MAKE) -C $(subst _clean,,$@) clean
-
-$(MODULES): force
-	$(MAKE) -C $@ 
-
-$(LIBTOOLS): force
-	$(MAKE) -C $@
+build: build-libtools build-bpfprog build-modules
 
 build-libtools: $(LIBTOOLS)
+	@echo "Build libtools finished."
 
-clean-libtools: $(LIBTOOLS_CLEAN)
+build-bpfprog: $(BPFPROG_DIR)
+	@echo "Build bpf programs finished."
 
-build-modules: $(MODULES)
+build-modules: $(MODULES) build-libvtl build-vtlui
+	@echo "Build vtl modules finished."
+
+build-libvtl: $(STATIC_LIBVTL)
+	@echo "Build static libvtl finished."
+
+build-vtlui: $(VTL_UI)
+	@echo "Build vtl ui finished."
+
+
+clean-bin: $(BIN_CLEAN)
+	@echo "Clean bin finished."
 
 clean-modules: $(MODULES_CLEAN)
-# build-modules: $(MODULES)
+	@echo "Clean modules finished."
 
-# build: build-modules
+clean-bpfprog: $(BPFPROG_CLEAN)
+	@echo "Clean bpf programs finished."
 
-# MODULES_CLEAN = $(addsuffix _clean, $(MODULES))
-# LIBVTL_CLEAN = $(addsuffix _clean, $(LIBVTL_DIR ))
-# ORCHESTRATOR_CLEAN = $(addsuffix _clean, $(ORCHESTRATOR))
-# TESTS_CLEAN = $(addsuffix _clean, $(TESTS))
-
-# VTL_CLEAN = $(LIBVTL_CLEAN) $(TESTS_CLEAN) $(ORCHESTRATOR_CLEAN) $(MODULES_CLEAN)  
+clean-libtools: $(LIBTOOLS_CLEAN)
+	@echo "Clean libtools finished."
 
 
+$(LIBTOOLS) $(BPFPROG_DIR) $(MODULES): force
+	$(MAKE) -C $@
 
-# LIBBPF_DIR = libbpf/src/
+$(STATIC_LIBVTL): $(LIBVTL_OBJS)
+	$(AR) $(ARFLAGS) $@ $?
 
-# OBJECT_LIBBPF = $(LIBBPF_DIR)/libbpf.a
+$(VTL_UI): $(SRC_DIR)/ui/vtl_ui.o $(LIBVTL_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBVTL_OBJS) $< $(LIBS)
 
-# all: dependencies build
-# 	@echo "Build finished."
+$(LIBTOOLS_CLEAN) $(BPFPROG_CLEAN) $(MODULES_CLEAN):
+	$(MAKE) -C $(subst _clean,,$@) clean
 
-# .PHONY: clean force dependencies
-
-# $(VTL_CLEAN):
-# 	$(MAKE) -C $(subst _clean,,$@) clean
-
-
-# clean: $(VTL_CLEAN)
-
-
-# # Compilation de la bibliothèque statique libbpf
-# $(OBJECT_LIBBPF):
-# 	@if [ ! -d $(LIBBPF_DIR) ]; then \
-# 		echo "Error: Need libbpf submodule"; \
-# 		echo "May need to run git submodule update --init"; \
-# 		exit 1; \
-# 	else \
-# 		cd $(LIBBPF_DIR) && $(MAKE) all; \
-# 		mkdir -p build; DESTDIR=build $(MAKE) install_headers; \
-# 	fi
-
-# libbpf: $(OBJECT_LIBBPF)
-
-# dependencies: libbpf
-
-
-
-
-
-# $(LIBVTL_DIR): force
-# 	$(MAKE) -C $@ 
-
-# build-libvtl: $(LIBVTL_DIR)
-# 	@echo "Build libvtl finished."
-
-# build-orchestrator: $(ORCHESTRATOR)
-# 	@echo "Build orchestrator finished."
-
-# $(TESTS): force
-# 	$(MAKE) -C $@
-
-# build-tests: $(TESTS)
-# 	@echo "Build tests finished."
-
-
-
-
+$(BIN_CLEAN):
+	$(RM) $(STATIC_LIBVTL) $(VTL_UI)
 
 force :;
 

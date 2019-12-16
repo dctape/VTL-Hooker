@@ -1,4 +1,4 @@
-BIN := vtl_deploy_ui
+BIN := vtl_ui
 OBJS := ${BIN:=.o}
 
 DEP_DIR = deps
