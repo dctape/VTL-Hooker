@@ -5,5 +5,8 @@
 #include "./vtl/vtl_macros.h"
 #include "./vtl/vtl_structures.h"
 
+//TODO: rework
+#include "../src/api/api.h"
+
 
 #endif /* __VTL_H */
