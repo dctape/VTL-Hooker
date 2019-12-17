@@ -12,11 +12,11 @@
 
 #define DATASIZE              1024 // ideal size ? 1024 ? 16k ?
 
-#define SRC_IP          "192.168.130.157"
-#define DST_IP          "192.168.130.159"
+#define SRC_IP          "192.168.130.159" //@vm2
+#define DST_IP          "192.168.130.157" //@vm1
 
 
-#define DEV_NAME                                "ens33"
+#define DEV_NAME         "ens33"
 
 
 int main(int argc, char const *argv[])

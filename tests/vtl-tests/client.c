@@ -15,8 +15,8 @@
 #define DATASIZE              1024 // ideal size ? 1024 ? 16k ?
 
 //TODO : Avons-nous besoin de ces données en réception ?
-#define SRC_IP          "192.168.130.159"
-#define DST_IP          "192.168.130.157"
+#define SRC_IP          "192.168.130.157" //@vm1
+#define DST_IP          "192.168.130.159" //@vm2
 
 
 #define DEV_NAME         "ens33"
@@ -49,7 +49,7 @@ int main(int argc, char const *argv[])
 	signal(SIGINT, exit_application); 
 
         printf("Client starting\n");
-        int mode = VTL_MODE_OUT;
+        int mode = VTL_MODE_IN;
         vtl_md = vtl_init(ifname, src_ip, mode, err_buf);
         if (vtl_md == NULL) {
                 fprintf(stderr, "%s", err_buf);
