@@ -10,11 +10,11 @@
 
 #include "../launcher/launcher.h"
 
-#define BPF_TC_FILENAME         "../bpf/bpf_tc.o"
-#define BPF_XDP_FILENAME        "../bpf/bpf_xdp.o"
+#define BPF_TC_FILENAME         "../src/bpf/bpf_tc.o"
+#define BPF_XDP_FILENAME        "../src/bpf/bpf_xdp.o"
 
 #define INPUT_MODE             0x1
-#define OUTPUT_MODE              0x2     
+#define OUTPUT_MODE            0x2     
 
 int menu_start(void)
 {
@@ -86,11 +86,9 @@ int deploy_tf(int mode)
         int ret; //use it
         char interface[20];
         
-        char xdp_file[] = BPF_XDP_FILENAME; 
         int xdp_flags = 0;
         struct xdp_config xdp_cfg = {0};
 
-        char tc_file[] = BPF_TC_FILENAME;
         struct tc_config tc_cfg = {0};
 
         switch (mode)
@@ -103,7 +101,7 @@ int deploy_tf(int mode)
 
                 xdp_flags &= ~XDP_FLAGS_MODES;   /* Clear flags */
                 xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */             
-                ret = launcher_deploy_xdp_tf(&xdp_cfg, xdp_file, interface,
+                ret = launcher_deploy_xdp_tf(&xdp_cfg, BPF_XDP_FILENAME, interface,
                                        xdp_flags);
                 if (ret < 0) {
                         fprintf(stderr, "%s", xdp_cfg.err_buf);
@@ -120,7 +118,7 @@ int deploy_tf(int mode)
                 /* deploy tf on selected interface */
                 printf("\n\nDeploying TF on %s interface in output mode...", interface);
                 
-                ret = launcher_deploy_tc_tf(&tc_cfg, tc_file, interface,
+                ret = launcher_deploy_tc_tf(&tc_cfg, BPF_TC_FILENAME, interface,
                                     TC_EGRESS_ATTACH);
                 if (ret < 0) {
                         fprintf(stderr, "%s", tc_cfg.err_buf);
@@ -211,11 +209,11 @@ void clear_screen(void)
 int main(int argc, char const *argv[])
 {
         int ret;
-        int c;
 
         int menu_choice;
         int mode;
         char enter = 0;
+        char c;
 
         clear_screen();
 
@@ -224,9 +222,6 @@ int main(int argc, char const *argv[])
                 // start menu
                 menu_choice = menu_start();
                 clear_screen();
-
-                /* clear input buffer */
-                while ((c = getchar()) != '\n' && c != EOF) { } 
 
                 switch (menu_choice)
                 {
@@ -241,11 +236,11 @@ int main(int argc, char const *argv[])
                                 break;
                         }
 
-                        /* clear input buffer */
-                        while ((c = getchar()) != '\n' && c != EOF) { }
-
-                        printf("\nPress Enter to return to menu start\n");
-                        while (enter != '\r' && enter != '\n') { enter = getchar(); }
+                        printf("Do you return to main menu or exit ? (M or E)\n");
+                        scanf("%c", &c);
+                        if (c == 'E') {
+                                menu_choice = 3;
+                        }
   
                         clear_screen();
 
@@ -257,13 +252,13 @@ int main(int argc, char const *argv[])
                                 menu_choice = 3;
                                 break;
                         }
-
-                        /* clear input buffer */
-                        while ((c = getchar()) != '\n' && c != EOF) { } 
-
-                        printf("\nPress Enter to return to menu start\n");                      
-                        while (enter != '\r' && enter != '\n') { enter = getchar(); }
-                        
+                       
+                        printf("Do you return to main menu or exit ? (M or E)\n");
+                        scanf("%c", &c);
+                        if (c == 'E') {
+                                menu_choice = 3;
+                        }
+                         
                         clear_screen();
 
                         break;
