@@ -4,6 +4,8 @@ TARGETS += client
 
 OBJS = ${TARGETS:=.o}
 
+RCV_FILES =  ./files-receiver
+
 ROOT_DIR = ../..
 LIBVTL_DIR = $(ROOT_DIR)/bin
 LIBBPF_DIR = $(ROOT_DIR)/lib/libbpf/src/
@@ -36,6 +38,9 @@ $(TARGETS): %: %.c $(OBJECT_LIBVTL) Makefile $(DEP_DIR)/%.d
 	$(CC) $(DEPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@  $< $(LIBS)
 	mv -f $(DEP_DIR)/$*.Td $(DEP_DIR)/$*.d
 
+.PHONY: clean
+clean:
+	$(RM) -r $(TARGETS) $(DEP_DIR) $(RCV_FILES)/*
 
 .PRECIOUS: $(DEP_DIR)/%.d
 $(DEP_DIR)/%.d: ;
