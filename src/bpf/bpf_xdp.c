@@ -12,14 +12,14 @@
 typedef struct vtl_header vtlhdr_t;
 struct vtl_header
 {
-        uint16_t checksum;
+    uint16_t checksum;
 };
 
 struct bpf_map_def SEC("maps") xsks_map = {
-	.type = BPF_MAP_TYPE_XSKMAP,
-	.key_size = sizeof(int),
-	.value_size = sizeof(int),
-	.max_entries = 64,  /* Assume netdev has no more than 64 queues */
+    .type = BPF_MAP_TYPE_XSKMAP,
+    .key_size = sizeof(int),
+    .value_size = sizeof(int),
+    .max_entries = 64, /* Assume netdev has no more than 64 queues */
 };
 
 /*struct bpf_map_def SEC("maps") xdp_stats_map = {
@@ -29,21 +29,20 @@ struct bpf_map_def SEC("maps") xsks_map = {
 	.max_entries = 64,
 }; */
 
-#define bpf_printk(fmt, ...)					\
-({								\
-	       char ____fmt[] = fmt;				\
-	       bpf_trace_printk(____fmt, sizeof(____fmt),	\
-				##__VA_ARGS__);			\
-})
-
+#define bpf_printk(fmt, ...)                       \
+    ({                                             \
+        char ____fmt[] = fmt;                      \
+        bpf_trace_printk(____fmt, sizeof(____fmt), \
+                         ##__VA_ARGS__);           \
+    })
 
 SEC("xdp_sock")
 int xdp_sock_prog(struct xdp_md *ctx)
 {
-        
-        //__u32 *pkt_count;
 
-        /* pkt_count = bpf_map_lookup_elem(&xdp_stats_map, &index);
+    //__u32 *pkt_count;
+
+    /* pkt_count = bpf_map_lookup_elem(&xdp_stats_map, &index);
         if (pkt_count) {
 
             // We pass every other packet 
@@ -51,42 +50,43 @@ int xdp_sock_prog(struct xdp_md *ctx)
                 return XDP_PASS;
         } */
 
-        // void *data = (void *)(long)ctx->data;
-        // void *data_end = (void *)(long)ctx->data_end;
+    // void *data = (void *)(long)ctx->data;
+    // void *data_end = (void *)(long)ctx->data_end;
 
-        // struct ethhdr *eth = (struct ethhdr *)data;
-        // if(eth + 1 > data_end)
-        //     return XDP_DROP;
-        
-        // struct iphdr *iph = (struct iphdr *)(eth + 1);
-        // if(iph + 1 > data_end)
-        //     return XDP_DROP;
-        
-        // bpf_printk("ip protocol : %d\n", iph->protocol);
+    // struct ethhdr *eth = (struct ethhdr *)data;
+    // if(eth + 1 > data_end)
+    //     return XDP_DROP;
 
-        int index = ctx->rx_queue_index;
+    // struct iphdr *iph = (struct iphdr *)(eth + 1);
+    // if(iph + 1 > data_end)
+    //     return XDP_DROP;
 
-        void *data = (void *)(long)ctx->data;
-        void *data_end = (void *)(long)ctx->data_end;
+    // bpf_printk("ip protocol : %d\n", iph->protocol);
 
-        struct ethhdr *eth = (struct ethhdr *)data;
-        if(eth + 1 > data_end)
-        	return XDP_DROP;
-        
-        struct iphdr *iph = (struct iphdr *)(eth + 1);
-        if(iph + 1 > data_end)
-             return XDP_DROP;
+    int index = ctx->rx_queue_index;
 
-        if(iph->protocol != IPPROTO_VTL) {		
-		return XDP_PASS;
-	    }
+    void *data = (void *)(long)ctx->data;
+    void *data_end = (void *)(long)ctx->data_end;
 
-	/* A set entry here means that the correspnding queue_id
-        * has an active AF_XDP socket bound to it. */
-        if (bpf_map_lookup_elem(&xsks_map, &index))
-            return bpf_redirect_map(&xsks_map, index, 0);
+    struct ethhdr *eth = (struct ethhdr *)data;
+    if (eth + 1 > data_end)
+        return XDP_DROP;
 
+    struct iphdr *iph = (struct iphdr *)(eth + 1);
+    if (iph + 1 > data_end)
+        return XDP_DROP;
+
+    if (iph->protocol != IPPROTO_VTL)
+    {
         return XDP_PASS;
+    }
+
+    /* A set entry here means that the correspnding queue_id
+        * has an active AF_XDP socket bound to it. */
+    if (bpf_map_lookup_elem(&xsks_map, &index))
+        return bpf_redirect_map(&xsks_map, index, 0);
+
+    return XDP_PASS;
 }
 
 char _license[] SEC("license") = "GPL";
