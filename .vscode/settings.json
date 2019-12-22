@@ -24,6 +24,7 @@
                 "launcher.h": "c",
                 "pcap.h": "c",
                 "defines.h": "c",
-                "vtl_macros.h": "c"
+                "vtl_macros.h": "c",
+                "adaptor_receive.h": "c"
         }
 }

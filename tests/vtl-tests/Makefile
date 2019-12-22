@@ -21,7 +21,7 @@ CFLAGS += -g -Wall -Wextra -Wpedantic \
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs 
 CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
-CFLAGS += -O2
+CFLAGS += -O0
 CFLAGS += -I$(ROOT_DIR)/include
 CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -g
 CFLAGS += -I$(ROOT_DIR)/src/headers/

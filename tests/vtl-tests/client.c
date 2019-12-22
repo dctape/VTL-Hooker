@@ -15,8 +15,8 @@
 #define DATASIZE              1024 // ideal size ? 1024 ? 16k ?
 
 //TODO : Avons-nous besoin de ces données en réception ?
-#define SRC_IP          "192.168.130.157" //@vm1
-#define DST_IP          "192.168.130.159" //@vm2
+#define SRC_IP          "192.168.130.157" //@vm1 = client
+#define DST_IP          "192.168.130.159" //@vm2 = server
 
 
 #define DEV_NAME         "ens33"
@@ -85,15 +85,16 @@ int main(int argc, char const *argv[])
                 cnt_pkt++;
                 cnt_bytes += rcv_data_s;
 
-                printf("Recv pkt: %d   Recv bytes: %d\r", cnt_pkt, cnt_bytes);
+                printf("Recv bytes: %d\r", cnt_bytes);
 	        fflush(stdout);
         }
         
         printf("Done\n");
         printf("\n");
 
-        printf("Nbrs of received packets: %d pkts\n", cnt_pkt);
+        //printf("Nbrs of received packets: %d pkts\n", cnt_pkt);
         printf("Nbrs of received bytes: %d bytes\n", cnt_bytes);
+        printf("Loop cnt: %d",cnt_pkt);
         printf("\n");
 
 	fclose(rx_file);

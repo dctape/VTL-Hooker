@@ -39,7 +39,7 @@ int main(int argc, char const *argv[])
         char src_ip[] = SRC_IP;
         char dst_ip[] = DST_IP;
         char target[] = DST_IP;
-        int mode = VTL_MODE_OUT;
+        int mode = VTL_MODE_IN;
         uint8_t data[] = "TEST";
         size_t datalen = strlen(data) + 1;
         test_vtl(ifname, data, datalen, target, dst_ip, src_ip, mode);

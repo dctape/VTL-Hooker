@@ -20,6 +20,6 @@ adaptor_create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 
 void 
 adaptor_rcv_data(struct xsk_socket_info *xsk_socket, uint8_t *rcv_data,
-		 size_t rcv_datalen, bool xsk_poll_mode);
+		 size_t *rcv_datalen, bool xsk_poll_mode);
 
 #endif /* __ADAPTOR_RECEIVE_H */

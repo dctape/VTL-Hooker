@@ -30,7 +30,7 @@
 #include <net/if.h>
 #include <linux/if_link.h>
 #include <linux/if_ether.h>
-//#include <linux/ip.h>
+#include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
 
@@ -42,11 +42,9 @@
 // #include "../common/params.h"
 // #include "../common/util_libbpf.h"
 // #include "../common/tc_user_helpers.h"
-#include "../../src/adaptor/adaptor_receive.h"
 #include "../../src/common/xsk_user_helpers.h"
 #include "../../src/common/xdp_user_helpers.h"
 
-#define DATASIZE              1024 // ideal size ? 1024 ? 16k ?
 
 #define XDP_FILENAME       		"../../src/bpf/bpf_xdp.o"
 #define NIC_NAME		   	"ens33"
@@ -116,9 +114,7 @@ static void recv_image_file(uint8_t *data, int size)
 // l'espace utilisateur
 // Véritable fonction pour le traitement de paquets reçus sur af_xdp socket
 static bool process_packet(struct xsk_socket_info *xsk,
-			   uint64_t addr, uint32_t len,
-			   uint8_t **rcv_data, size_t *rcv_datalen,
-			   FILE *rx_file)
+			   uint64_t addr, uint32_t len)
 {	
 	int hdr_size;
 	int data_size;
@@ -131,41 +127,21 @@ static bool process_packet(struct xsk_socket_info *xsk,
 	uint8_t *data = (uint8_t*)(vtlh + 1); 
 
 	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct vtlhdr);
-	data_size = len - hdr_size;
-
-	//memcpy(rcv_data, data, data_size);
-	*rcv_data = data;
-        *rcv_datalen = data_size;
-
-	printf("rx_file: %p\n", rx_file);
-	fwrite(*rcv_data, 1, *rcv_datalen, rx_file);
-	fflush(rx_file);
+	data_size = len - hdr_size;	
 	
-
-	
-	// recv_image_file(data, data_size);
+	recv_image_file(data, data_size);
 
 	cnt_pkt++;
-	//cnt_bytes += data_size;
-	cnt_bytes += *rcv_datalen;
-	// printf("vtl->checksum: %d  Recv pkt: %d   Recv bytes: %d\r", 
-	// 	vtlh->checksum,cnt_pkt, cnt_bytes);
-	// fflush(stdout);
+	cnt_bytes += data_size;
+	printf("vtl->checksum: %d  Recv pkt: %d   Recv bytes: %d\r", 
+		vtlh->checksum,cnt_pkt, cnt_bytes);
+	fflush(stdout);
 	
 	return true;
 }
 
-static void handle_receive_packets(struct xsk_socket_info *xsk, 
-					uint8_t **rcv_data, size_t *rcv_datalen)
+static void handle_receive_packets(struct xsk_socket_info *xsk)
 {
-	
-	FILE *rx_file = NULL;
-	rx_file = fopen("lion.jpg", "ab");
-	if (rx_file == NULL) {
-		fprintf(stderr, "ERR: failed to open test file\n");
-                exit(EXIT_FAILURE);
-	}
-	
 	unsigned int rcvd, stock_frames, i;
 	uint32_t idx_rx = 0, idx_fq = 0;
 	int ret;
@@ -200,7 +176,7 @@ static void handle_receive_packets(struct xsk_socket_info *xsk,
 		uint64_t addr = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx)->addr;
 		uint32_t len = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx++)->len;
 
-		if (!process_packet(xsk, addr, len, rcv_data, rcv_datalen, rx_file))
+		if (!process_packet(xsk, addr, len))
 			xsk_free_umem_frame(xsk, addr);
 
 		xsk->stats.rx_bytes += len; //TODO : Est-ce nécessaire ??
@@ -211,40 +187,35 @@ static void handle_receive_packets(struct xsk_socket_info *xsk,
 
 	/* Do we need to wake up the kernel for transmission */
 	//complete_tx(xsk); //TODO: Est-ce nécessaire ?
-
-	
-	fclose(rx_file);
 }
 
 static void rx_and_process(struct xdp_config *cfg,
-			   struct xsk_socket_info *xsk_socket,
-			   uint8_t **rcv_data, size_t *rcv_datalen)
+			   struct xsk_socket_info *xsk_socket)
 {	
-	/* Pas trop bien compris... */
-	// struct pollfd fds[2];
-	// int ret, nfds = 1;
+	// Pas trop bien compris...
+	struct pollfd fds[2];
+	int ret, nfds = 1;
 
-	// memset(fds, 0, sizeof(fds));
-	// fds[0].fd = xsk_socket__fd(xsk_socket->xsk);
-	// fds[0].events = POLLIN;
+	memset(fds, 0, sizeof(fds));
+	fds[0].fd = xsk_socket__fd(xsk_socket->xsk);
+	fds[0].events = POLLIN;
 
-	// cnt_pkt = 0;
-	// cnt_bytes = 0;
+	cnt_pkt = 0;
+	cnt_bytes = 0;
+	printf("Start capture\n");
+	bool xsk_poll_mode = true;
+	while(!global_exit){
+		if (xsk_poll_mode){
 	
-	// bool xsk_poll_mode = false;
-	
-	// if (xsk_poll_mode){	
-	// 	ret = poll(fds, nfds, -1);
-	// 	if (ret <= 0 || ret > 1)
-	// 		return; 
-	// }
+			ret = poll(fds, nfds, -1);
+			if (ret <= 0 || ret > 1)
+				continue; 
+		}
 		
-	handle_receive_packets(xsk_socket, rcv_data, rcv_datalen);
-
-	printf("Recv pkt: %d   Recv bytes: %d\r" 
-		,cnt_pkt, cnt_bytes);
-	fflush(stdout);
+		handle_receive_packets(xsk_socket);
+	}
 	
+	printf("End capture\n");
 }
 
 static void exit_application(int signal)
@@ -253,25 +224,84 @@ static void exit_application(int signal)
 	global_exit = true;
 }
 
-struct xsk_socket_info *
-xsk_sock_creat(struct xdp_config *cfg, struct xsk_umem_info *umem, int xsk_bind_flags, 
-		int xsk_if_queue) 
-{
 
+int main(int argc, char **argv)
+{
+    	int ret;
 	int xsks_map_fd;
 	void *packet_buffer;
 	uint64_t packet_buffer_size;
 
 	struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
+    	struct xdp_config cfg = {
+		.filename = XDP_FILENAME,
+		.progsec = "xdp_sock",
+		.do_unload = false,
+		.ifindex = if_nametoindex(NIC_NAME),
+		.ifname = NIC_NAME // sert pas à grande chose de le préciser !!	
+    	};
+	
+	// Pour activer le mode skb...ens33 ne supporte pas le mode driver
+	// TODO: adapter l'injection en fonction du mode
+	cfg.xdp_flags &= ~XDP_FLAGS_MODES;    /* Clear flags */
+	cfg.xdp_flags |= XDP_FLAGS_SKB_MODE;  /* Set   flag */
+	// cfg.xsk_bind_flags &= XDP_ZEROCOPY;
+	// cfg.xsk_bind_flags |= XDP_COPY;
+	int xsk_bind_flags = 0;
+	xsk_bind_flags &= XDP_ZEROCOPY;
+	xsk_bind_flags |= XDP_COPY;
 
-	//struct xsk_umem_info *umem;
+	int xsk_if_queue = 0;
+
+    	struct xsk_umem_info *umem;
 	struct xsk_socket_info *xsk_socket;
+	struct bpf_object *bpf_obj = NULL;
 
+
+	/* Global shutdown handler */
+	signal(SIGINT, exit_application);
+
+        if (cfg.ifindex == -1) {
+		fprintf(stderr, "ERROR: Required option --dev missing\n\n");
+		return EXIT_FAIL_OPTION;
+	}
+
+        if (cfg.filename[0] == 0)
+        	return EXIT_FAIL;
+    
+    	/* Chargement de programme XDP... */
+	//TODO: add cfg.do_unload...    
+	struct bpf_map *map;
+
+    	// bpf_obj = load_bpf_and_xdp_attach(&cfg, cfg.filename, cfg.ifname,cfg.xdp_flags,
+	//     				 cfg.reuse_maps);
+	// if (!bpf_obj) {
+	// 	/* Error handling done in load_bpf_and_xdp_attach() */
+	// 	exit(EXIT_FAILURE);
+	// }
+
+	// /* We also need to load the xsks_map */
+	// map = bpf_object__find_map_by_name(bpf_obj, "xsks_map");
+	// xsks_map_fd = bpf_map__fd(map);
+	// if (xsks_map_fd < 0) {
+	// 	fprintf(stderr, "ERROR: no xsks map found: %s\n",
+	// 		strerror(xsks_map_fd));
+	// 	exit(EXIT_FAILURE);
+	// }
+
+    	/* Code pour l'utilisation des af_xdp sockets */
+
+   	/* Allow unlimited locking of memory, so all memory needed for packet
+	 * buffers can be locked.
+	 */
 	if (setrlimit(RLIMIT_MEMLOCK, &rlim)) {
 		fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
 			strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+
+     	/* Allocate memory for NUM_FRAMES of the default XDP frame size */
+	// getpagesize: obtenir des pages mémoires du système
 	packet_buffer_size = NUM_FRAMES * FRAME_SIZE;
 
 	if (posix_memalign(&packet_buffer,
@@ -292,7 +322,7 @@ xsk_sock_creat(struct xdp_config *cfg, struct xsk_umem_info *umem, int xsk_bind_
 	}
 
 	/* Open and configure the AF_XDP (xsk) socket */
-	xsk_socket = xsk_configure_socket(cfg->ifname, cfg->xdp_flags, xsk_bind_flags,
+	xsk_socket = xsk_configure_socket(cfg.ifname, cfg.xdp_flags, xsk_bind_flags,
 	 				xsk_if_queue, umem);
 	if (xsk_socket == NULL) {
 
@@ -300,91 +330,20 @@ xsk_sock_creat(struct xdp_config *cfg, struct xsk_umem_info *umem, int xsk_bind_
 			strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+    
+	// Ai-je besoin d'un thread pour afficher les statistiques
+	//Et quelle statistique ?
+    	//Pas trop besoin pour le moment...
 
-	return xsk_socket;
-
-}
-
-int main(int argc, char **argv)
-{
-    	
-	char err_buf[ERRBUF_SIZE];
-
-    	struct xdp_config cfg = {
-		.filename = XDP_FILENAME,
-		.progsec = "xdp_sock",
-		.do_unload = false,
-		.ifindex = if_nametoindex(NIC_NAME),
-		.ifname = NIC_NAME // sert pas à grande chose de le préciser !!	
-    	};
-
-	if (cfg.ifindex == -1) {
-		fprintf(stderr, "ERROR: Required option --dev missing\n\n");
-		return EXIT_FAIL_OPTION;
-	}
-
-        if (cfg.filename[0] == 0)
-        	return EXIT_FAIL;
-	
-
-	cfg.xdp_flags &= ~XDP_FLAGS_MODES;    /* Clear flags */
-	cfg.xdp_flags |= XDP_FLAGS_SKB_MODE;  /* Set   flag */
-
-	int xsk_bind_flags = 0;
-	xsk_bind_flags &= XDP_ZEROCOPY;
-	xsk_bind_flags |= XDP_COPY;
-
-	int xsk_if_queue = 0;
-
-    	struct xsk_umem_info *umem;
-	struct xsk_socket_info *xsk_socket;
-
-
-	/* Global shutdown handler */
-	signal(SIGINT, exit_application);
-
-	xsk_socket = adaptor_create_xsk_sock(cfg.ifname, cfg.xdp_flags, xsk_bind_flags, xsk_if_queue,
-						umem, err_buf);
-	
-	//xsk_socket = xsk_sock_creat(&cfg, umem, xsk_bind_flags, xsk_if_queue);
 	/* Receive and count packets than drop them */
 	
-	// rx_and_process(&cfg, xsk_socket);
-	// FILE *rx_file = NULL;
-	// rx_file = fopen("lion.jpg", "ab");
-	// if (rx_file == NULL) {
-	// 	fprintf(stderr, "ERR: failed to open test file\n");
-        //         exit(EXIT_FAILURE);
-	// }
-
-	printf("Start capture\n");
-	uint8_t *rcv_data;
-	// rcv_data = (uint8_t *) malloc (DATASIZE * sizeof (uint8_t));
-        // if (rcv_data == NULL) {
-        //         fprintf (stderr, 
-        //                 "ERR: Cannot allocate memory for snd_data.\n");
-        //         exit(EXIT_FAILURE);
-        // }
-	size_t rcv_data_s = 0;
-	bool xsk_poll_mode = false;
-	size_t ret;
-	while(!global_exit) {
-
-		rx_and_process(&cfg, xsk_socket, &rcv_data, &rcv_data_s);
-		//fwrite(rcv_data, 1, rcv_data_s, rx_file);
-		//ret++;
-		//printf("ret :%ld ", ret);
-		//fflush(rx_file);
-		//memset(rcv_data)
-	}
-	// fclose(rx_file);
-	printf("%ld\n", rcv_data_s);
-	printf("End capture\n");
+	rx_and_process(&cfg, xsk_socket);
 	
+
 	/* Cleanup */
 	xsk_socket__delete(xsk_socket->xsk);
-	//xsk_umem__delete(umem->umem);
-	//xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
+	xsk_umem__delete(umem->umem);
+	// xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
 
 	return EXIT_OK;
 

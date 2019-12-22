@@ -170,7 +170,7 @@ handle_receive_packets(struct xsk_socket_info *xsk, uint8_t *rcv_data, size_t *r
 //TODO: Revoir le code de retour
 void 
 adaptor_rcv_data(struct xsk_socket_info *xsk_socket, uint8_t *rcv_data,
-		 size_t rcv_datalen, bool xsk_poll_mode)
+		 size_t *rcv_datalen, bool xsk_poll_mode)
 {	
 	// Pas trop bien compris...
 	struct pollfd fds[2];
@@ -188,7 +188,7 @@ adaptor_rcv_data(struct xsk_socket_info *xsk_socket, uint8_t *rcv_data,
 			return; 
 	}
 		
-	handle_receive_packets(xsk_socket, rcv_data, &rcv_datalen);
+	handle_receive_packets(xsk_socket, rcv_data, rcv_datalen);
 	
 }
 
