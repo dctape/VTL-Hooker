@@ -89,11 +89,13 @@ bad:
 }
 
 static bool 
-process_packet(struct xsk_socket_info *xsk, uint64_t addr, 
-                uint32_t len, uint8_t *rcv_data, size_t *rcv_datalen)
+process_packet(struct xsk_socket_info *xsk, 
+		uint64_t addr, uint32_t len, 
+		FILE *rx_file,
+		uint32_t *cnt_pkts, uint32_t *cnt_bytes)
 {	
-	int hdr_size;
-	int data_size;
+	uint32_t hdr_size;
+	uint32_t data_size;
 
 	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);
 	
@@ -106,18 +108,20 @@ process_packet(struct xsk_socket_info *xsk, uint64_t addr,
 	data_size = len - hdr_size;	
 	
         //TODO: Make a linked list or a ring buffer ???
-	//rcv_data = data;
-	//WARN: strcpy...
-	//strcpy(rcv_data, data);
-	memcpy(rcv_data, data, data_size);
-        *rcv_datalen = data_size;
-	
+	fwrite(data, 1, data_size, rx_file);
+	fflush(rx_file);
+
+	*cnt_pkts += 1;
+	*cnt_bytes += data_size;
+
 	return true;
 }
 
 //TODO: Improve this
 static void 
-handle_receive_packets(struct xsk_socket_info *xsk, uint8_t *rcv_data, size_t *rcv_datalen)
+handle_receive_packets(struct xsk_socket_info *xsk, 
+			FILE *rx_file,
+			uint32_t *cnt_pkts, uint32_t *cnt_bytes)
 {
 	unsigned int rcvd, stock_frames, i;
 	uint32_t idx_rx = 0, idx_fq = 0;
@@ -154,7 +158,7 @@ handle_receive_packets(struct xsk_socket_info *xsk, uint8_t *rcv_data, size_t *r
 		uint64_t addr = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx)->addr;
 		uint32_t len = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx++)->len;
 
-		if (!process_packet(xsk, addr, len, rcv_data, rcv_datalen))
+		if (!process_packet(xsk, addr, len, rx_file, cnt_pkts, cnt_bytes))
 			xsk_free_umem_frame(xsk, addr);
 
 		//xsk->stats.rx_bytes += len; //TODO : Est-ce nécessaire ??
@@ -169,8 +173,9 @@ handle_receive_packets(struct xsk_socket_info *xsk, uint8_t *rcv_data, size_t *r
 
 //TODO: Revoir le code de retour
 void 
-adaptor_rcv_data(struct xsk_socket_info *xsk_socket, uint8_t *rcv_data,
-		 size_t *rcv_datalen, bool xsk_poll_mode)
+adaptor_rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
+		FILE *rx_file,
+		uint32_t *cnt_pkts, uint32_t *cnt_bytes)
 {	
 	// Pas trop bien compris...
 	struct pollfd fds[2];
@@ -188,7 +193,7 @@ adaptor_rcv_data(struct xsk_socket_info *xsk_socket, uint8_t *rcv_data,
 			return; 
 	}
 		
-	handle_receive_packets(xsk_socket, rcv_data, rcv_datalen);
+	handle_receive_packets(xsk_socket, rx_file, cnt_pkts, cnt_bytes);
 	
 }
 

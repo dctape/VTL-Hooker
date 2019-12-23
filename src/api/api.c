@@ -27,8 +27,9 @@ vtl_init(char *ifname, char *src_ip, int mode, char *err_buf)
         //TODO: put it vtl metadata struct
         struct xsk_umem_info umem = {0}; // always initialize!!! 
         vtl_md_t *vtl_md = NULL;
-
+        //TODO: Make test malloc return
         vtl_md = (vtl_md_t *)malloc(sizeof(vtl_md_t));
+        memset(vtl_md, 0, sizeof(vtl_md_t));
         switch (mode)
         {
         case VTL_MODE_IN:
@@ -131,14 +132,11 @@ int vtl_snd(vtl_md_t *vtl_md, char *target,char *dst_ip, uint8_t *data,
 
 //vtl_rcv: recoit des données via la vtl
 //TODO: add flags ??
-ssize_t
-vtl_rcv(vtl_md_t *vtl_md, void *buf)
+void
+vtl_rcv(vtl_md_t *vtl_md, FILE *rx_file)
 {
         //TODO: add return code
-        adaptor_rcv_data(vtl_md->xsk_socket, vtl_md->rcv_data,
-		 vtl_md->rcv_datalen, vtl_md->xsk_poll_mode);
-        //buf = vtl_md->rcv_data;
-        memcpy(buf, vtl_md->rcv_data, vtl_md->rcv_datalen);
+        adaptor_rcv_data(vtl_md->xsk_socket, vtl_md->xsk_poll_mode, rx_file,
+                        &vtl_md->cnt_pkts, &vtl_md->cnt_bytes);
 
-        return vtl_md->rcv_datalen;
 }

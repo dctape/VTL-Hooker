@@ -43,7 +43,9 @@ struct vtl_metadata
         char ifname[IF_NAMESIZE];
         char target[40];
         struct ifreq ifr; // TODO: is it necessary ?
-        
+        //TODO: find a better name.
+        uint32_t cnt_pkts;
+        uint32_t cnt_bytes;
 
         char err_buf[VTL_ERRBUF_SIZE];
 };

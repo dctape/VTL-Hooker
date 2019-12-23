@@ -19,7 +19,8 @@ adaptor_create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 			int xsk_if_queue, struct xsk_umem_info *umem, char *err_buf);
 
 void 
-adaptor_rcv_data(struct xsk_socket_info *xsk_socket, uint8_t *rcv_data,
-		 size_t *rcv_datalen, bool xsk_poll_mode);
+adaptor_rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
+		FILE *rx_file,
+		uint32_t *cnt_pkts, uint32_t *cnt_bytes);
 
 #endif /* __ADAPTOR_RECEIVE_H */

@@ -20,8 +20,8 @@ vtl_md_t *
 vtl_init(char *ifname, char *src_ip, int mode, char *err_buf);
 int 
 vtl_snd(vtl_md_t *vtl_md, char *target, char *dst_ip, uint8_t *data, size_t datalen, char *err_buf);
-ssize_t 
-vtl_rcv(vtl_md_t *vtl_md, void *buf);
+void 
+vtl_rcv(vtl_md_t *vtl_md, FILE *rx_file);
 
 
 

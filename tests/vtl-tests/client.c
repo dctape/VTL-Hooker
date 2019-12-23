@@ -32,12 +32,9 @@ static void exit_application(int signal)
 int main(int argc, char const *argv[])
 {
 
-        int cnt_pkt = 0;
-        int cnt_bytes = 0;
-       
-        FILE *rx_file = NULL;
-        uint8_t *rcv_data;
-        size_t rcv_data_s;
+
+        
+
 
         char ifname[] = "ens33";
         char src_ip[] = SRC_IP;
@@ -60,6 +57,7 @@ int main(int argc, char const *argv[])
 
         /* Ouverture */
         //TODO: change error message
+        FILE *rx_file = NULL;
         rx_file = fopen("./files-receiver/lion.jpg", "ab");
 	if (rx_file == NULL) {
 		fprintf(stderr, "ERR: failed to open test file\n");
@@ -68,24 +66,12 @@ int main(int argc, char const *argv[])
 
         printf("\n");
         printf("Receiving data...");
-        rcv_data = (uint8_t *) malloc (DATASIZE * sizeof (uint8_t));
-        if (rcv_data == NULL) {
-                fprintf (stderr, 
-                        "ERR: Cannot allocate memory for snd_data.\n");
-                exit(EXIT_FAILURE);
-        }
-        memset (rcv_data, 0, DATASIZE * sizeof (uint8_t));
         global_exit = false;
         while (!global_exit)
         {
-                rcv_data_s = vtl_rcv(vtl_md, rcv_data);
-                fwrite(rcv_data, 1, rcv_data_s, rx_file);
-                fflush(rx_file);
-
-                cnt_pkt++;
-                cnt_bytes += rcv_data_s;
-
-                printf("Recv bytes: %d\r", cnt_bytes);
+                vtl_rcv(vtl_md, rx_file);
+                printf("Recv pkt: %d   Recv bytes: %d\r" 
+		, vtl_md->cnt_pkts, vtl_md->cnt_bytes);
 	        fflush(stdout);
         }
         
@@ -93,14 +79,13 @@ int main(int argc, char const *argv[])
         printf("\n");
 
         //printf("Nbrs of received packets: %d pkts\n", cnt_pkt);
-        printf("Nbrs of received bytes: %d bytes\n", cnt_bytes);
-        printf("Loop cnt: %d",cnt_pkt);
+        // printf("Nbrs of received bytes: %d bytes\n", cnt_bytes);
+        // printf("Loop cnt: %d",cnt_pkt);
         printf("\n");
 
 	fclose(rx_file);
 
-
-
+        //TODO: vtl_destroy or vtl_close
 
         return 0;
 }

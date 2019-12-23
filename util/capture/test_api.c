@@ -1,12 +1,4 @@
 
-/* 
- * Code pour la capture de données depuis XDP +
- * Transmission dans l'espace utilisateur  par
- * un socket AF_XDP 
- */
-
-/* SPDX-License-Identifier: GPL-2.0 */
-
 #include <assert.h>
 #include <errno.h>
 #include <getopt.h>
@@ -39,9 +31,6 @@
 // #include "../../include/vtl/vtl.h"
 
 // TODO: réduire le contenu des fichiers à inclure
-// #include "../common/params.h"
-// #include "../common/util_libbpf.h"
-// #include "../common/tc_user_helpers.h"
 #include "../../src/adaptor/adaptor_receive.h"
 #include "../../src/common/xsk_user_helpers.h"
 #include "../../src/common/xdp_user_helpers.h"
@@ -54,8 +43,6 @@
 #ifndef PATH_MAX
 #define PATH_MAX	4096
 #endif
-
-
 //TODO : comprendre la signification de ces define
 #define RX_BATCH_SIZE      		64
 #define ERRBUF_SIZE     256
@@ -66,29 +53,9 @@ struct vtlhdr
         uint16_t checksum;
 };
 
-
 static bool global_exit;
 static int cnt_pkt;
 static int cnt_bytes;
-
-
-static void recv_txt_file(uint8_t *data, int size)
-{
-
-	static FILE *rx_file = NULL;
-	
-	rx_file = fopen("file.txt", "ab");
-	if (rx_file == NULL) {
-		fprintf(stderr, "ERR: failed to open test file\n");
-                exit(EXIT_FAILURE);
-	}
-
-	fwrite(data, 1, size, rx_file);
-	fflush(rx_file);
-
-	fclose(rx_file);
-
-}
 
 static void recv_image_file(uint8_t *data, int size)
 {
@@ -108,17 +75,9 @@ static void recv_image_file(uint8_t *data, int size)
 
 }
 
-/*
- * configure_xsk_umem() : Allocation et "création" du umem (userspace memory)
- * 
- */
-// Fonction principale de traitement de paquet dans
-// l'espace utilisateur
-// Véritable fonction pour le traitement de paquets reçus sur af_xdp socket
 static bool process_packet(struct xsk_socket_info *xsk,
 			   uint64_t addr, uint32_t len,
-			   uint8_t **rcv_data, uint32_t *rcv_datalen,
-			   bool *do_rcv_pkt)
+                           FILE *rx_file)
 {	
 	uint32_t hdr_size;
 	uint32_t data_size;
@@ -133,32 +92,15 @@ static bool process_packet(struct xsk_socket_info *xsk,
 	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct vtlhdr);
 	data_size = len - hdr_size;
 
-	//memcpy(rcv_data, data, data_size);
-	*rcv_data = data;
-        *rcv_datalen = data_size;
-
-	// printf("rx_file: %p\n", rx_file);
-	// fwrite(*rcv_data, 1, *rcv_datalen, rx_file);
-	// fflush(rx_file);
-	
-
-	
-	// recv_image_file(data, data_size);
+        fwrite(data, 1, data_size, rx_file);
+	fflush(rx_file);
 
 	cnt_pkt++;
-	//cnt_bytes += data_size;
-	cnt_bytes += *rcv_datalen;
-	// printf("vtl->checksum: %d  Recv pkt: %d   Recv bytes: %d\r", 
-	// 	vtlh->checksum,cnt_pkt, cnt_bytes);
-	// fflush(stdout);
-	*do_rcv_pkt = true;
-	
+	cnt_bytes += data_size;	
 	return true;
 }
 
-static void handle_receive_packets(struct xsk_socket_info *xsk, 
-					uint8_t **rcv_data, uint32_t *rcv_datalen,
-					bool *do_rcv_pkt)
+static void handle_receive_packets(struct xsk_socket_info *xsk, FILE *rx_file)
 {
 		
 	unsigned int rcvd, stock_frames, i;
@@ -195,7 +137,7 @@ static void handle_receive_packets(struct xsk_socket_info *xsk,
 		uint64_t addr = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx)->addr;
 		uint32_t len = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx++)->len;
 
-		if (!process_packet(xsk, addr, len, rcv_data, rcv_datalen, do_rcv_pkt))
+		if (!process_packet(xsk, addr, len, rx_file))
 			xsk_free_umem_frame(xsk, addr);
 
 		xsk->stats.rx_bytes += len; //TODO : Est-ce nécessaire ??
@@ -211,100 +153,39 @@ static void handle_receive_packets(struct xsk_socket_info *xsk,
 	
 }
 
-static void rx_and_process(struct xdp_config *cfg,
-			   struct xsk_socket_info *xsk_socket,
-			   uint8_t **rcv_data, uint32_t *rcv_datalen)
+static void rx_and_process(struct xsk_socket_info *xsk_socket, FILE *rx_file)
 {	
-	/* Pas trop bien compris... */
-	bool do_rcv_pkt = false;
-	// struct pollfd fds[2];
-	// int ret, nfds = 1;
+	// Pas trop bien compris...
+	struct pollfd fds[2];
+	int ret, nfds = 1;
 
-	// memset(fds, 0, sizeof(fds));
-	// fds[0].fd = xsk_socket__fd(xsk_socket->xsk);
-	// fds[0].events = POLLIN;
+	memset(fds, 0, sizeof(fds));
+	fds[0].fd = xsk_socket__fd(xsk_socket->xsk);
+	fds[0].events = POLLIN;
 
-	// cnt_pkt = 0;
-	// cnt_bytes = 0;
+	cnt_pkt = 0;
+	cnt_bytes = 0;
+	printf("Start capture\n");
+	bool xsk_poll_mode = true;
 	
-	// bool xsk_poll_mode = false;
-
-	while (do_rcv_pkt != true) {
+	if (xsk_poll_mode){
+	
+		ret = poll(fds, nfds, -1);
+		if (ret <= 0 || ret > 1)
+			return; 
+		}
 		
-		// if (xsk_poll_mode){	
-		// 	ret = poll(fds, nfds, -1);
-		// 	if (ret <= 0 || ret > 1)
-		// 		return; 
-		// }
-		
-		handle_receive_packets(xsk_socket, rcv_data, rcv_datalen, &do_rcv_pkt);
-		
-	}
+	handle_receive_packets(xsk_socket, rx_file);
 	printf("Recv pkt: %d   Recv bytes: %d\r" 
 		,cnt_pkt, cnt_bytes);
 	fflush(stdout);
-	
-	
-	
-	
+	printf("End capture\n");
 }
 
 static void exit_application(int signal)
 {
 	signal = signal;
-	global_exit = false;
-}
-
-struct xsk_socket_info *
-xsk_sock_creat(struct xdp_config *cfg, struct xsk_umem_info *umem, int xsk_bind_flags, 
-		int xsk_if_queue) 
-{
-
-	int xsks_map_fd;
-	void *packet_buffer;
-	uint64_t packet_buffer_size;
-
-	struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
-
-	//struct xsk_umem_info *umem;
-	struct xsk_socket_info *xsk_socket;
-
-	if (setrlimit(RLIMIT_MEMLOCK, &rlim)) {
-		fprintf(stderr, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	packet_buffer_size = NUM_FRAMES * FRAME_SIZE;
-
-	if (posix_memalign(&packet_buffer,
-			   getpagesize(), /* PAGE_SIZE aligned */
-			   packet_buffer_size)) {
-		fprintf(stderr, "ERROR: Can't allocate buffer memory \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	/* Initialize shared packet_buffer for umem usage */
-	umem = configure_xsk_umem(packet_buffer, packet_buffer_size);
-	if (umem == NULL) {
-
-		fprintf(stderr, "ERROR: Can't create umem \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	/* Open and configure the AF_XDP (xsk) socket */
-	xsk_socket = xsk_configure_socket(cfg->ifname, cfg->xdp_flags, xsk_bind_flags,
-	 				xsk_if_queue, umem);
-	if (xsk_socket == NULL) {
-
-		fprintf(stderr, "ERROR: Can't setup AF_XDP socket \"%s\"\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	return xsk_socket;
-
+	global_exit = true;
 }
 
 int main(int argc, char **argv)
@@ -338,7 +219,7 @@ int main(int argc, char **argv)
 
 	int xsk_if_queue = 0;
 
-    	struct xsk_umem_info *umem;
+    	struct xsk_umem_info *umem = NULL;
 	struct xsk_socket_info *xsk_socket;
 
 
@@ -347,42 +228,48 @@ int main(int argc, char **argv)
 
 	xsk_socket = adaptor_create_xsk_sock(cfg.ifname, cfg.xdp_flags, xsk_bind_flags, xsk_if_queue,
 						umem, err_buf);
+	if (xsk_socket == NULL) {
+		/* code */
+	}
 	
-	//xsk_socket = xsk_sock_creat(&cfg, umem, xsk_bind_flags, xsk_if_queue);
-	/* Receive and count packets than drop them */
-	
-	FILE *debug_file = NULL;
-	debug_file = fopen("debug.txt", "a");
-	if (debug_file == NULL) {
-		fprintf(stderr, "ERR: failed to open debug file\n");
+
+	// FILE *debug_file = NULL;
+	// debug_file = fopen("debug.txt", "a");
+	// if (debug_file == NULL) {
+	// 	fprintf(stderr, "ERR: failed to open debug file\n");
+        //         exit(EXIT_FAILURE);
+	// }
+	FILE *rx_file = NULL;
+	rx_file = fopen("lion.jpg", "ab");
+	if (rx_file == NULL) {
+		fprintf(stderr, "ERR: failed to open test file\n");
                 exit(EXIT_FAILURE);
 	}
 
-
+	// printf("Start capture\n");
+	bool xsk_poll_mode = false;
+	int cnt_pkts = 0;
+	int cnt_bytes_2 = 0;
 	printf("Start capture\n");
-	uint8_t *rcv_data;
-	// rcv_data = (uint8_t *) malloc (DATASIZE * sizeof (uint8_t));
-        // if (rcv_data == NULL) {
-        //         fprintf (stderr, 
-        //                 "ERR: Cannot allocate memory for snd_data.\n");
-        //         exit(EXIT_FAILURE);
-        // }
-	uint32_t rcv_data_s = 0;
 	while(!global_exit) {
 		
-		rcv_data_s = -1;
-		rx_and_process(&cfg, xsk_socket, &rcv_data, &rcv_data_s);
-		recv_image_file(rcv_data, rcv_data_s);		
-		fprintf(debug_file, "rcv_data_s: %d\n", rcv_data_s);
+		//rx_and_process(xsk_socket, rx_file);
+		adaptor_rcv_data(xsk_socket, xsk_poll_mode, rx_file,
+				&cnt_pkts, &cnt_bytes_2);
+		printf("Recv pkt: %d   Recv bytes: %d\r" 
+		,cnt_pkts, cnt_bytes_2);
+		fflush(stdout);
+
 	}
-	// fclose(rx_file);
-	fclose(debug_file);
+	fclose(rx_file);
+	//fclose(debug_file);
 	//printf("%ld\n", rcv_data_s);
 	printf("End capture\n");
 	
 	/* Cleanup */
 	xsk_socket__delete(xsk_socket->xsk);
 	//xsk_umem__delete(umem->umem);
+	
 	//xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
 
 	return EXIT_OK;

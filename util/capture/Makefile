@@ -2,6 +2,7 @@ ROOT_DIR = ../../
 
 TARGETS := capture
 TARGETS += cpy_capture
+TARGETS += test_api
 OBJS = ${TARGETS:=.o}
 
 CLEAN_FILE = lion.jpg

@@ -3,7 +3,11 @@
 #include <string.h>
 #define DATA_SIZE       30
 
-void sub_cpy(char **str, int *len, FILE *rx_file){
+struct Test {
+        int cnt;
+};
+
+void sub_cpy(char **str, int *len, FILE *rx_file, int *cnt){
 
         char cpy_str[] = "Copie depuis cpy!!!\n";
         *len = strlen(cpy_str) + 1;
@@ -11,6 +15,7 @@ void sub_cpy(char **str, int *len, FILE *rx_file){
         *str = cpy_str;
         fwrite(*str, 1, *len , rx_file);
         fflush(rx_file);
+        *cnt += 1;
 }
 
 void cpy(char **str, int *len)
@@ -21,9 +26,10 @@ void cpy(char **str, int *len)
 		fprintf(stderr, "ERR: failed to open test file\n");
                 exit(EXIT_FAILURE);
 	}
-        sub_cpy(str, len, rx_file);
+        struct Test test = {0};
+        sub_cpy(str, len, rx_file, &test.cnt);
+        printf("test.cnt :%d\n", test.cnt);
         
-
 }
 
 int main(int argc, char const *argv[])

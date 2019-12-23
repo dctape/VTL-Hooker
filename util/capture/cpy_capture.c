@@ -84,7 +84,7 @@ static void recv_txt_file(uint8_t *data, int size)
 	fwrite(data, 1, size, rx_file);
 	fflush(rx_file);
 
-	fclose(rx_file);
+	//fclose(rx_file);
 
 }
 
