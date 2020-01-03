@@ -62,7 +62,7 @@ tc_egress_attach_bpf(struct tc_config *cfg)
 	snprintf(cmd, CMD_MAX,
 		 "%s filter add dev %s "
 		 "egress prio 1 handle 1 bpf da obj %s sec tf_tc_egress",
-		 tc_cmd, cfg->dev, cfg->filename); // TODO: adapt that line for our use cases
+		 tc_cmd, cfg->dev, cfg->filename); // TODO: adapt that line for our use cases ~ tf_tc_egress
 
 	//TODO : - find why prio 1 handle 1
 	//       - change sec ingress_redirect to section name of my bpf file
