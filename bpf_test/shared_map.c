@@ -4,13 +4,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h> 	/* clock_t */
 #include <unistd.h>      /* access */
+
+#include <net/if.h>	/* ifnametoindex */
 
 #include <sys/statfs.h>  /* statfs */
 #include <sys/stat.h>    /* stat(2) + S_IRWXU */
 #include <sys/mount.h>   /* mount(2) */
 
 #include <linux/err.h>
+#include <linux/if_link.h>
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -251,6 +255,30 @@ int tc_ingress_attach_bpf(const char* dev, const char* bpf_obj,
 	return ret;
 }
 
+int tc_remove_ingress_filter(const char* dev)
+{
+	char cmd[CMD_MAX];
+	int ret = 0;
+
+	memset(&cmd, 0, CMD_MAX);
+	snprintf(cmd, CMD_MAX,
+		 /* Remove all egress filters on dev */
+		 "%s filter delete dev %s egress",
+		 /* Alternatively could remove specific filter handle:
+		 "%s filter delete dev %s egress prio 1 handle 1 bpf",
+		 */
+		 tc_cmd, dev);
+	if (verbose) printf(" - Run: %s\n", cmd);
+	ret = system(cmd);
+	if (ret) {
+		fprintf(stderr,
+			"ERR(%d): tc cannot remove filters\n Cmdline:%s\n",
+			ret, cmd);
+		exit(EXIT_FAILURE);
+	}
+	return ret;
+}
+
 /* TODO move to libbpf */
 struct bpf_pinned_map {
 	const char *name;
@@ -318,9 +346,179 @@ static int find_map_fd_by_name(struct bpf_object *obj,
 // 	return 0;
 // }
 
+/* As close as possible to libbpf bpf_prog_load_xattr(), with the
+ * difference of handling pinned maps.
+ */
+
+#define pr_warning printf
+int bpf_prog_load_xattr_maps(const struct bpf_prog_load_attr_maps *attr,
+			     struct bpf_object **pobj, int *prog_fd)
+{
+	struct bpf_object_open_attr open_attr = {
+		.file		= attr->file,
+		.prog_type	= attr->prog_type,
+	};
+	struct bpf_program *prog, *first_prog = NULL;
+	enum bpf_attach_type expected_attach_type;
+	enum bpf_prog_type prog_type;
+	struct bpf_object *obj;
+	struct bpf_map *map;
+	int err;
+	int i;
+
+	if (!attr)
+		return -EINVAL;
+	if (!attr->file)
+		return -EINVAL;
+
+
+	obj = bpf_object__open_xattr(&open_attr);
+	if (IS_ERR_OR_NULL(obj))
+		return -ENOENT;
+
+	bpf_object__for_each_program(prog, obj) {
+		/*
+		 * If type is not specified, try to guess it based on
+		 * section name.
+		 */
+		prog_type = attr->prog_type;
+#if 0 /* Use internal libbpf variables */
+		prog->prog_ifindex = attr->ifindex;
+#endif
+		expected_attach_type = attr->expected_attach_type;
+#if 0 /* Use internal libbpf variables */
+		if (prog_type == BPF_PROG_TYPE_UNSPEC) {
+			err = bpf_program__identify_section(prog, &prog_type,
+							    &expected_attach_type);
+			if (err < 0) {
+				bpf_object__close(obj);
+				return -EINVAL;
+			}
+		}
+#endif
+
+		bpf_program__set_type(prog, prog_type);
+		bpf_program__set_expected_attach_type(prog,
+						      expected_attach_type);
+
+		if (!first_prog)
+			first_prog = prog;
+	}
+
+	/* Reset attr->pinned_maps.map_fd to identify successful file load */
+	for (i = 0; i < attr->nr_pinned_maps; i++)
+		attr->pinned_maps[i].map_fd = -1;
+
+	bpf_map__for_each(map, obj) {
+		const char* mapname = bpf_map__name(map);
+
+#if 0 /* Use internal libbpf variables */
+		if (!bpf_map__is_offload_neutral(map))
+			map->map_ifindex = attr->ifindex;
+#endif
+		for (i = 0; i < attr->nr_pinned_maps; i++) {
+			struct bpf_pinned_map *pin_map = &attr->pinned_maps[i];
+			int fd;
+
+			if (strcmp(mapname, pin_map->name) != 0)
+				continue;
+
+			/* Matched, try opening pinned file */
+			fd = bpf_obj_get(pin_map->filename);
+			if (fd > 0) {
+				/* Use FD from pinned map as replacement */
+				bpf_map__reuse_fd(map, fd);
+				/* TODO: Might want to set internal map "name"
+				 * if opened pinned map didn't, to allow
+				 * bpf_object__find_map_fd_by_name() to work.
+				 */
+				pin_map->map_fd = fd;
+				continue;
+			}
+			/* Could not open pinned filename map, then this prog
+			 * should then pin the map, BUT this can only happen
+			 * after bpf_object__load().
+			 */
+		}
+	}
+
+	if (!first_prog) {
+		pr_warning("object file doesn't contain bpf program\n");
+		bpf_object__close(obj);
+		return -ENOENT;
+	}
+
+	err = bpf_object__load(obj);
+	if (err) {
+		bpf_object__close(obj);
+		return -EINVAL;
+	}
+
+	/* Pin the maps that were not loaded via pinned filename */
+	bpf_map__for_each(map, obj) {
+		const char* mapname = bpf_map__name(map);
+
+		for (i = 0; i < attr->nr_pinned_maps; i++) {
+			struct bpf_pinned_map *pin_map = &attr->pinned_maps[i];
+			int err;
+
+			if (strcmp(mapname, pin_map->name) != 0)
+				continue;
+
+			/* Matched, check if map is already loaded */
+			if (pin_map->map_fd != -1)
+				continue;
+
+			/* Needs to be pinned */
+			err = bpf_map__pin(map, pin_map->filename);
+			if (err)
+				continue;
+			pin_map->map_fd = bpf_map__fd(map);
+		}
+	}
+
+	/* Help user if requested map name that doesn't exist */
+	for (i = 0; i < attr->nr_pinned_maps; i++) {
+		struct bpf_pinned_map *pin_map = &attr->pinned_maps[i];
+
+		if (pin_map->map_fd < 0)
+			pr_warning("%s() requested mapname:%s not seen\n",
+				   __func__, pin_map->name);
+	}
+
+	*pobj = obj;
+	*prog_fd = bpf_program__fd(first_prog);
+	return 0;
+}
+
+void remove_xdp_program(int ifindex, const char *ifname, __u32 xdp_flags)
+{
+	// const char *file = mapfile_ip_hash;
+	// __u32 dir = INTERFACE_NONE;
+
+	if (verbose) {
+		fprintf(stderr, "Removing XDP program on ifindex:%d device:%s\n",
+			ifindex, ifname);
+	}
+	if (ifindex > -1) {
+		bpf_set_link_xdp_fd(ifindex, -1, xdp_flags);
+		// if (bpf_map_update_elem(ifindex_type_map_fd,
+		// 			&ifindex, &dir, 0) < 0) {
+		// 	fprintf(stderr, "ERR: Clear ifindex type failed \n");
+		// }
+	}
+
+	/* map file is possibly share, cannot remove it here */
+	// if (verbose)
+	// 	fprintf(stderr,
+	// 		"INFO: not cleanup pinned map file:%s (use 'rm')\n",
+	// 		file);
+}
+
 int main(int argc, char const *argv[])
 {
         /* Depend on sharing pinned maps */
+	// partagé entre user programme XDP et TC
 	if (bpf_fs_check_and_fix()) {
 		fprintf(stderr, "ERR: "
 			"Need access to bpf-fs(%s) for pinned maps "
@@ -375,7 +573,79 @@ int main(int argc, char const *argv[])
         printf("bpf_map_update_elem success!\n");
 
         /* load xdp program */
-       
+	struct bpf_pinned_map pinned_map;
+        struct bpf_prog_load_attr_maps prog_load_attr_maps = {
+		.prog_type	= BPF_PROG_TYPE_XDP,
+		.nr_pinned_maps	= 1,
+	};
+        pinned_map.name = "map_shared";
+        pinned_map.filename = mapfile_map_shared;
 
+        prog_load_attr_maps.pinned_maps = &pinned_map;
+	prog_load_attr_maps.file = BPF_XDP_FILENAME;
+
+	int ifindex = if_nametoindex(ifname);
+	if (ifindex == 0) {
+		fprintf(stderr,
+			"ERR: --dev name unknown err(%d):%s\n",
+			errno, strerror(errno));
+		return -1;
+	}
+	printf("if_nametoindex success!\n");
+       
+	__u32 xdp_flags = 0;
+	xdp_flags |= XDP_FLAGS_SKB_MODE;
+	struct bpf_object *xdp_obj;
+	int prog_fd;
+	if (bpf_prog_load_xattr_maps(&prog_load_attr_maps, &xdp_obj, &prog_fd)) {
+		fprintf(stderr,"ERR: Failed loading BPF-prog\n");
+		//return EXIT_FAIL_BPF;
+		goto remove_tc;
+	}
+
+	// init_map_fds
+	int xdp_shared_map_fd = -1;
+	xdp_shared_map_fd = find_map_fd_by_name(xdp_obj, "map_shared", &prog_load_attr_maps);
+	if (xdp_shared_map_fd < 0) {
+		fprintf(stderr, "bpf_object__find_map_fd_by_name failed\n");
+		goto remove_tc;
+	}
+	printf("find_map_fd_by_name success!\n");
+
+	if ((err = bpf_set_link_xdp_fd(ifindex, prog_fd, xdp_flags)) < 0) {
+		fprintf(stderr, "ERR: link set xdp fd failed (err:%d)\n", err);
+		goto remove_xdp;
+	}
+	printf("bpf_set_link_xdp_fd success!\n");
+
+	int msec = 0, trigger = 1000000000000000000000000000; /* 10ms */
+	clock_t before = clock();
+	int key = 0;
+	struct bpf_count prog_cnt;
+	do {
+		
+		/* lecture dans la map partagée */
+		err = bpf_map_lookup_elem(map_shared_fd, &key,&prog_cnt);
+		if (err < 0) {
+			fprintf(stderr, " bpf_map_lookup_elem shared map failed!\n");
+			break;
+		}
+
+		printf("xdp_cnt: %d  tc_cnt: %d  tot_cnt: %d\r", 
+			prog_cnt.xdp_cnt, prog_cnt.tc_cnt, prog_cnt.tot_cnt);
+
+		// clock_t difference = clock() - before;
+		// msec = difference * 1000 / CLOCKS_PER_SEC;
+	} while (1);
+	// while ( msec < trigger );
+
+remove_tc:
+	/* unload tc prog kern */
+	tc_remove_ingress_filter(ifname);
+	printf("tc_remove_ingress_filter success!\n");
+
+remove_xdp:
+	remove_xdp_program(ifindex, ifname, xdp_flags);
+	printf("remove_xdp_program success!\n");
         return 0;
 }

@@ -23,6 +23,13 @@ vtl_snd(vtl_md_t *vtl_md, char *target, char *dst_ip, uint8_t *data, size_t data
 void 
 vtl_rcv(vtl_md_t *vtl_md, FILE *rx_file);
 
+int
+vtl_listen(vtl_md_t *vtl_md);
+int 
+vtl_listen_stop(vtl_md_t *vtl_md);
+ssize_t
+vtl_rcv_perf(vtl_md_t *vtl_md, void *buf, ssize_t len);
+
 
 
 

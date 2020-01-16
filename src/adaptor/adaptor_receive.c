@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include <bpf/xsk.h> // ajouter libbpf lors de la compilation
+#include <bpf/libbpf.h> // perf_event functions
 
 #include <sys/resource.h>
 
@@ -197,3 +198,117 @@ adaptor_rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 	
 }
 
+/** reception through perf_event buffer **/
+
+#define SAMPLE_SIZE	1530
+
+// Enfiler
+void enqueue(struct perf_rcv_data_list *list, struct perf_rcv_data *frag)
+{
+	if( list->first == NULL &&  list->last == NULL) {
+		list->first = frag;
+		list->last = frag;
+	}
+	else {
+		list->last->next = frag;
+		list->last = frag;
+	}
+	list->len = list->len + 1;
+
+}
+
+// défiler
+struct perf_rcv_data *
+dequeue(struct perf_rcv_data_list *list) 
+{
+
+
+}
+
+// perf_event callback function
+static void 
+handle_perf_recv_pkts(void *ctx, int cpu, void *data, __u32 size)
+{
+	vtl_md_t *vtl_md = (vtl_md_t *)ctx;
+	struct perf_rcv_data *rcv_data; 
+	struct {
+		__u16 cookie;
+		__u16 pkt_len;
+		__u8  pkt_data[SAMPLE_SIZE];
+	} *e = data; // __packed
+
+	uint16_t hdr_size;
+	uint16_t data_size;
+
+	if (e->cookie != 0xdead) {
+		printf("BUG cookie %x sized %d\n", e->cookie, size);
+		return;
+	}
+
+	struct ethhdr *eth = (struct ethhdr *)e->pkt_data;
+        struct iphdr *iph = (struct iphdr *)(eth + 1);
+	vtlhdr_t *vtlh = (vtlhdr_t *)(iph + 1);
+	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) 
+			+ sizeof(vtlhdr_t);
+	data_size = e->pkt_len - hdr_size;
+
+	rcv_data->data = (uint8_t*)(vtlh + 1);
+	rcv_data->data_len = data_size;
+
+	enqueue(vtl_md->rcv_data_list, rcv_data);
+	sem_post(&vtl_md->rcv_sem);
+
+}
+
+// thread function
+// TODO: Est-ce possible d'avoir de meilleurs codes d'erreur
+void * 
+thread_function (void *args)
+{
+	int err, ret;
+	struct perf_buffer_opts pb_opts = {0};
+	vtl_md_t *vtl_md = (vtl_md_t *)args; 
+
+	pb_opts.sample_cb = handle_perf_recv_pkts;
+	pb_opts.ctx = vtl_md;
+
+	vtl_md->pb = perf_buffer__new(vtl_md->perf_map_fd, 8, &pb_opts); // Pourquoi 8 ?
+	err = libbpf_get_error(vtl_md->pb);
+	if (err) {
+		perror("perf_buffer setup failed");
+		return NULL;
+	}
+
+	while ((ret = perf_buffer__poll(vtl_md->pb, 1000)) >= 0) {
+	}
+
+	return NULL;
+
+}
+
+int 
+adaptor_listen_thread(vtl_md_t *vtl_md)
+{
+	int ret;
+	ret = pthread_create(&vtl_md->rcv_thread, NULL, thread_function, 
+			(void *)vtl_md);
+	if (ret != 0) {
+		perror("ERR: thread creation failed");
+		return -1;
+	}
+
+	return 0;
+}
+
+int
+adaptor_stop_listen_thread(vtl_md_t *vtl_md)
+{
+	int ret;
+	ret = pthread_cancel(&vtl_md->rcv_thread);
+	if (ret != 0) {
+		perror("ERR: thread cancel failed");
+		return -1;
+	}
+
+	return 0;
+}

@@ -6,11 +6,31 @@
 #include <net/if.h>     // struct ifreq
 #include <netinet/ip.h> // struct ip and IP_MAXPACKET (which is 65535)
 #include <stdint.h>
+#include <semaphore.h>
+#include <pthread.h>
 
 //TODO: Break dependency with common folder.
 #include "vtl_macros.h"
 #include "../../src/common/xdp_user_helpers.h"
 #include "../../src/common/xsk_user_helpers.h"
+
+
+// TODO: déterminer le bon type de données
+// TODO: reécrire les noms !
+struct perf_rcv_data
+{
+        struct perf_rcv_data *next;
+        uint16_t data_len;
+        uint8_t *data;
+};
+
+struct perf_rcv_data_list
+{
+        struct perf_rcv_data *first;
+        struct perf_rcv_data *last;
+        int len;
+}
+
 
 /* En-tête de paquet vtl */
 typedef struct vtl_header vtlhdr_t;
@@ -46,6 +66,15 @@ struct vtl_metadata
         //TODO: find a better name.
         uint32_t cnt_pkts;
         uint32_t cnt_bytes;
+
+        /* Reception with perf_event buffer */
+        int perf_map_fd;
+        struct perf_buffer *pb; // à garder pour libération du buffer
+        sem_t rcv_sem;
+        pthread_t rcv_thread;
+        struct perf_rcv_data_list *rcv_data_list;
+
+
 
         char err_buf[VTL_ERRBUF_SIZE];
 };

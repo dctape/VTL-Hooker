@@ -27,7 +27,7 @@ int xdp_count_prog(struct xdp_md *ctx)
                 return XDP_ABORTED;
         cnt->xdp_cnt = cnt->xdp_cnt + 1;
 
-        return XDP_PASS;
+        return XDP_DROP;
         
 }
 

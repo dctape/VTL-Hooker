@@ -151,4 +151,7 @@ struct bpf_offset_reloc {
 	__u32   access_str_off;
 };
 
+int parse_cpu_mask_str(const char *s, bool **mask, int *mask_sz);
+int parse_cpu_mask_file(const char *fcpu, bool **mask, int *mask_sz);
+
 #endif /* __LIBBPF_LIBBPF_INTERNAL_H */

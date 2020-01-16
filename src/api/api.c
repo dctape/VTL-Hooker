@@ -140,3 +140,31 @@ vtl_rcv(vtl_md_t *vtl_md, FILE *rx_file)
                         &vtl_md->cnt_pkts, &vtl_md->cnt_bytes);
 
 }
+
+/** receive data with perf_event buffer **/
+// vtl_listen:
+//retval : 0 success , -1 error
+int
+vtl_listen(vtl_md_t *vtl_md)
+{
+        return adaptor_listen_thread(vtl_md);
+}
+
+int 
+vtl_listen_stop(vtl_md_t *vtl_md)
+{
+        return adaptor_stop_listen_thread(vtl_md);
+}
+
+ssize_t
+vtl_rcv_perf(vtl_md_t *vtl_md, void *buf, ssize_t len)
+{
+        vtl_md->rcv_datalen = adaptor_rcv_perf_data(&vtl_md->rcv_sem, 
+                                                vtl_md->rcv_data_list,
+                                                vtl_md->rcv_data);
+        //TODO: Comparer len et rcv_datalen
+        
+        memcpy(buf, vtl_md->rcv_data, vtl_md->rcv_datalen);
+
+        return vtl_md->rcv_datalen; 
+}

@@ -1,6 +1,13 @@
 {
         "files.associations": {
                 "libbpf.h": "c",
-                "bpf.h": "c"
+                "bpf.h": "c",
+                "ptrace.h": "c",
+                "version.h": "c",
+                "perf_event.h": "c",
+                "ioctl.h": "c",
+                "libgen.h": "c",
+                "ip.h": "c",
+                "in.h": "c"
         }
 }

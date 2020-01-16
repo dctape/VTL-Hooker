@@ -1,6 +1,8 @@
 ROOT_DIR = .
 
 USER_TARGETS := shared_map
+USER_TARGETS += xdp_ack
+USER_TARGETS += op_bit
 
 USER_OBJS = ${USER_TARGETS:=.o}
 

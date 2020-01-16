@@ -23,4 +23,14 @@ adaptor_rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 		FILE *rx_file,
 		uint32_t *cnt_pkts, uint32_t *cnt_bytes);
 
+int 
+adaptor_listen_thread(vtl_md_t *vtl_md);
+
+int
+adaptor_stop_listen_thread(vtl_md_t *vtl_md);
+
+ssize_t
+adaptor_rcv_perf_data(sem_t *sem, struct perf_rcv_data_list *rcv_list,
+			uint8_t *data);
+
 #endif /* __ADAPTOR_RECEIVE_H */

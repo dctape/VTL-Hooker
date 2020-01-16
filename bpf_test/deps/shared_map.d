@@ -58,12 +58,26 @@ shared_map: shared_map.c /usr/include/stdc-predef.h /usr/include/errno.h \
  /usr/include/strings.h \
  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
+ /usr/include/time.h /usr/include/x86_64-linux-gnu/bits/time.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h \
  /usr/include/unistd.h /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
  /usr/include/x86_64-linux-gnu/bits/environments.h \
  /usr/include/x86_64-linux-gnu/bits/confname.h \
  /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
  /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
- /usr/include/x86_64-linux-gnu/bits/unistd.h \
+ /usr/include/x86_64-linux-gnu/bits/unistd.h /usr/include/net/if.h \
+ /usr/include/x86_64-linux-gnu/sys/socket.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h \
+ /usr/include/x86_64-linux-gnu/bits/socket.h \
+ /usr/include/x86_64-linux-gnu/bits/socket_type.h \
+ /usr/include/x86_64-linux-gnu/bits/sockaddr.h \
+ /usr/include/x86_64-linux-gnu/asm/socket.h \
+ /usr/include/asm-generic/socket.h \
+ /usr/include/x86_64-linux-gnu/asm/sockios.h \
+ /usr/include/asm-generic/sockios.h \
+ /usr/include/x86_64-linux-gnu/bits/types/struct_osockaddr.h \
+ /usr/include/x86_64-linux-gnu/bits/socket2.h \
  /usr/include/x86_64-linux-gnu/sys/statfs.h \
  /usr/include/x86_64-linux-gnu/bits/statfs.h \
  /usr/include/x86_64-linux-gnu/sys/stat.h \
@@ -84,7 +98,9 @@ shared_map: shared_map.c /usr/include/stdc-predef.h /usr/include/errno.h \
  /usr/include/linux/stddef.h \
  /usr/include/x86_64-linux-gnu/asm/posix_types.h \
  /usr/include/x86_64-linux-gnu/asm/posix_types_64.h \
- /usr/include/asm-generic/posix_types.h \
+ /usr/include/asm-generic/posix_types.h headers/linux/if_link.h \
+ /usr/include/linux/netlink.h /usr/include/linux/kernel.h \
+ /usr/include/linux/sysinfo.h /usr/include/linux/socket.h \
  lib/libbpf/src//build/usr/include/bpf/bpf.h headers/linux/bpf.h \
  /usr/include/linux/bpf_common.h \
  /usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h /usr/include/stdint.h \
@@ -228,6 +244,14 @@ shared_map: shared_map.c /usr/include/stdc-predef.h /usr/include/errno.h \
 
 /usr/include/x86_64-linux-gnu/bits/string_fortified.h:
 
+/usr/include/time.h:
+
+/usr/include/x86_64-linux-gnu/bits/time.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_tm.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h:
+
 /usr/include/unistd.h:
 
 /usr/include/x86_64-linux-gnu/bits/posix_opt.h:
@@ -241,6 +265,30 @@ shared_map: shared_map.c /usr/include/stdc-predef.h /usr/include/errno.h \
 /usr/include/x86_64-linux-gnu/bits/getopt_core.h:
 
 /usr/include/x86_64-linux-gnu/bits/unistd.h:
+
+/usr/include/net/if.h:
+
+/usr/include/x86_64-linux-gnu/sys/socket.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_iovec.h:
+
+/usr/include/x86_64-linux-gnu/bits/socket.h:
+
+/usr/include/x86_64-linux-gnu/bits/socket_type.h:
+
+/usr/include/x86_64-linux-gnu/bits/sockaddr.h:
+
+/usr/include/x86_64-linux-gnu/asm/socket.h:
+
+/usr/include/asm-generic/socket.h:
+
+/usr/include/x86_64-linux-gnu/asm/sockios.h:
+
+/usr/include/asm-generic/sockios.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_osockaddr.h:
+
+/usr/include/x86_64-linux-gnu/bits/socket2.h:
 
 /usr/include/x86_64-linux-gnu/sys/statfs.h:
 
@@ -293,6 +341,16 @@ headers/linux/err.h:
 /usr/include/x86_64-linux-gnu/asm/posix_types_64.h:
 
 /usr/include/asm-generic/posix_types.h:
+
+headers/linux/if_link.h:
+
+/usr/include/linux/netlink.h:
+
+/usr/include/linux/kernel.h:
+
+/usr/include/linux/sysinfo.h:
+
+/usr/include/linux/socket.h:
 
 lib/libbpf/src//build/usr/include/bpf/bpf.h:
 
