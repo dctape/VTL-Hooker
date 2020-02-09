@@ -2,6 +2,7 @@ ROOT_DIR = ../../
 #TODO: add hooker bpf files
 BPF_TARGETS := bpf_tc.o
 BPF_TARGETS += bpf_xdp.o
+BPF_TARGETS += bpf_arqin.o
 
 INCLUDE_BPF = include
 INCLUDE_VTL = $(ROOT_DIR)/include/vtl

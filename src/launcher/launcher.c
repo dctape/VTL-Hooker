@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,12 +6,18 @@
 #include <linux/if_link.h>
 
 //TODO: découpler launcher de libbpf
+#include <bpf/bpf.h>
 #include <bpf/libbpf.h>
+
+#include "../../include/vtl/vtl_macros.h"
+#include "../../include/vtl/vtl_structures.h"
 
 #include "../common/tc_user_helpers.h"
 #include "../common/xdp_user_helpers.h"
 
 #include "launcher.h"
+
+int perf_map_fd;
 
 /** 
   * Deploy transport functions on tc hook.
@@ -23,7 +30,7 @@
   * 
 */ 
 int
-launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int flags)
+launcher__deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int flags)
 {
         int ifindex = if_nametoindex(interface);    
         
@@ -79,7 +86,7 @@ launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, int
 */ 
 //TODO: make it more simple in removing struct tc_config
 int
-launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
+launcher__remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
 {       
 
         int ifindex = if_nametoindex(interface);    
@@ -131,7 +138,7 @@ launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags)
 */
 // TODO: put err_buf as parameter 
 int 
-launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname, 
+launcher__deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname, 
                         __u32 xdp_flags)
 {       
 
@@ -171,7 +178,7 @@ launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname,
   * 
 */
 int
-launcher_remove_xdp_tf(char *ifname, __u32 xdp_flags)
+launcher__remove_xdp_tf(char *ifname, __u32 xdp_flags)
 {
         int ret;
         int ifindex = if_nametoindex(ifname);
@@ -183,6 +190,123 @@ launcher_remove_xdp_tf(char *ifname, __u32 xdp_flags)
         return 0;
 }
 
+/** deploy and remove ARQ functions **/
+// Error: 'xdp_sock' not found
+struct bpf_object * 
+launcher__xdp_deploy(struct xdp_config *cfg, char *bpf_file, char *ifname, 
+                        __u32 xdp_flags)
+{       
+
+        struct bpf_object *bpf_obj = NULL;
+
+        if (bpf_file[0] == 0) {
+                snprintf(cfg->err_buf, ERRBUF_SIZE, "ERR: bad tf_file\n");
+                return NULL;
+        }
+                
+        //TODO: 2nd test on tf_file - verify that ebpf prog type is XDP
+        bool reuse_maps = false;
+        bpf_obj = load_bpf_and_xdp_attach(cfg, bpf_file, ifname, xdp_flags, reuse_maps);
+	if (bpf_obj == NULL) {
+		/* Error handling done in load_bpf_and_xdp_attach */
+		return NULL;
+	}
+
+        // struct bpf_map *map = NULL;
+        // map = bpf_object__find_map_by_name(bpf_obj, "xsks_map");
+        // int xsks_map_fd = bpf_map__fd(map);
+        // if (xsks_map_fd < 0) {
+        //         snprintf(cfg->err_buf, ERRBUF_SIZE, "ERR: no xsks map found: %s\n",
+        //                 strerror(xsks_map_fd));
+        //         return -1;
+	// }
+        return bpf_obj;
+}
+
+int
+launcher__xdp_remove(char *ifname, __u32 xdp_flags)
+{
+        int ret;
+        int ifindex = if_nametoindex(ifname);
+        ret = xdp_link_detach(ifindex, xdp_flags, 0);
+        if (ret != 0) {
+                // Error message ?
+                return -1;
+        }
+        return 0;
+}
+
+static int do_attach(int idx, int fd, const char *name,  __u32 xdp_flags)
+{
+	struct bpf_prog_info info = {0}; // location linux/bpf.h
+	__u32 info_len = sizeof(info);
+	int err;
+
+	err = bpf_set_link_xdp_fd(idx, fd, xdp_flags);
+	if (err < 0) {
+		printf("ERROR: failed to attach program to %s\n", name);
+		return err;
+	}
+
+	err = bpf_obj_get_info_by_fd(fd, &info, &info_len);
+	if (err) {
+		printf("can't get prog info - %s\n", strerror(errno));
+		return err;
+	}
+	//prog_id = info.id;
+
+	return err;
+}
+
+//retval 0 success, -1 failure
+int
+launcher__arqin_deploy(struct xdp_config *cfg, char *arqin_file, char *ifname, 
+                        __u32 xdp_flags)
+{
+        int prog_fd;
+        struct bpf_object *bpf_obj = NULL;
+        struct bpf_prog_load_attr prog_load_attr = {
+		.prog_type	= BPF_PROG_TYPE_XDP,
+	};
+        prog_load_attr.file = arqin_file;
+        
+        if (bpf_prog_load_xattr(&prog_load_attr, &bpf_obj, &prog_fd))
+		return -1;
+        if (!prog_fd) {
+		printf("bpf_prog_load_xattr: %s\n", strerror(errno));
+		return -1;
+	}
+
+        struct bpf_map *map;
+        map = bpf_map__next(NULL, bpf_obj);
+	if (!map) {
+		printf("ERR: finding perf map in obj file failed\n");
+		return -1;
+	}
+        perf_map_fd = bpf_map__fd(map);
+
+        int if_idx = if_nametoindex(ifname);
+	if (!if_idx)
+		if_idx = strtoul(ifname, NULL, 0);
+
+	if (!if_idx) {
+		fprintf(stderr, "Invalid ifname\n");
+		return 1;
+	}
+
+        int err = do_attach(if_idx, prog_fd, ifname, xdp_flags);
+	if (err)
+		return -1;
+                //return err;
+
+        return 0;
+}
+
+// int 
+// launcher_arqin_remove()
+// {
+
+// }
 
 
 

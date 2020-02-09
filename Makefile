@@ -42,7 +42,7 @@ ARFLAGS = rcs
 LDFLAGS ?= -L$(LIBBPF_DIR) 
 
 LIBS := -l:libbpf.a -lelf 
-LIBS += -lpcap
+LIBS += -lpcap -lpthread
 
 all: build
 	@echo "Build finished."

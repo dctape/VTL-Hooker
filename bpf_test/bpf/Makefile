@@ -3,6 +3,8 @@ ROOT_DIR = ..
 BPF_TARGETS := tc_kern.o
 BPF_TARGETS += xdp_kern.o
 BPF_TARGETS += xdp_ack_kern.o
+BPF_TARGETS += xdp_basic.o
+BPF_TARGETS += tail_call_kern.o
 
 INCLUDE_BPF = include
 #INCLUDE_VTL = $(ROOT_DIR)/include/vtl

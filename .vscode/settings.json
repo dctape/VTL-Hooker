@@ -25,6 +25,8 @@
                 "pcap.h": "c",
                 "defines.h": "c",
                 "vtl_macros.h": "c",
-                "adaptor_receive.h": "c"
+                "adaptor_receive.h": "c",
+                "in.h": "c",
+                "util.h": "c"
         }
 }

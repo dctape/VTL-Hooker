@@ -1,6 +1,7 @@
 
 TARGETS := server
 TARGETS += client
+TARGETS += client_perf
 
 OBJS = ${TARGETS:=.o}
 
@@ -30,7 +31,7 @@ OBJECT_LIBVTL = $(LIBVTL_DIR)/libvtl.a
 
 LDFLAGS = -L$(LIBVTL_DIR)
 LDFLAGS += -L$(LIBBPF_DIR) 
-LIBS  = -l:libvtl.a -l:libbpf.a -lelf
+LIBS  = -l:libvtl.a -l:libbpf.a -lelf -lpthread
 
 all: $(TARGETS)
 

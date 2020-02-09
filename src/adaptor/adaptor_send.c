@@ -11,17 +11,16 @@
 #include <string.h>           // strcpy, memset(), and memcpy()
 #include <errno.h>            // errno, perror()
 
-#include "../../include/vtl/vtl_macros.h"
-#include "../../include/vtl/vtl_structures.h"
-#include "../common/util.h"
+#include "../../include/vtl.h"
 
-#include "adaptor_send.h"
+#include "../common/util.h"
+#include "adaptor.h"
 
 
 
 
 int
-adaptor_create_raw_sock(int domain, int protocol, char *err_buf)
+adaptor__create_raw_sock(int domain, int protocol, char *err_buf)
 {
         int sock_fd;
         
@@ -101,7 +100,7 @@ bind_raw_sock_to_interface(char *interface, int sock_fd)
 
 
 int
-adaptor_config_raw_sock(int sockfd, char* interface, char *err_buf)
+adaptor__config_raw_sock(int sockfd, char* interface, char *err_buf)
 {       
         int ret;
 
@@ -276,7 +275,7 @@ send_packet(int sock_fd, struct sockaddr_in *to, uint8_t *snd_packet, size_t snd
 
 
 int
-adaptor_send_packet(int sock_fd, uint8_t *snd_packet, vtlhdr_t *vtlh, struct ip *iphdr,  
+adaptor__send_packet(int sock_fd, uint8_t *snd_packet, vtlhdr_t *vtlh, struct ip *iphdr,  
                         char *target, char *dst_ip, char *src_ip, 
                         int *ip_flags, uint8_t *snd_data, size_t snd_datalen, char *err_buf)
 {

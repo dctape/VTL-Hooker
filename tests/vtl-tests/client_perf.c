@@ -7,10 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h> // rlimit
 
 #include <vtl/vtl.h>
-
-
 
 #define DATASIZE              1024 // ideal size ? 1024 ? 16k ?
 
@@ -22,6 +21,24 @@
 #define DEV_NAME         "ens33"
 
 static bool global_exit;
+
+static void recv_image_file(uint8_t *data, int size)
+{
+
+	static FILE *rx_file = NULL;
+	
+	rx_file = fopen("lion.jpg", "ab");
+	if (rx_file == NULL) {
+		fprintf(stderr, "ERR: failed to open test file\n");
+                exit(EXIT_FAILURE);
+	}
+
+	fwrite(data, 1, size, rx_file);
+	fflush(rx_file);
+
+	fclose(rx_file);
+
+}
 
 static void exit_application(int signal)
 {
@@ -35,9 +52,16 @@ int main(int argc, char const *argv[])
 
         char ifname[] = "ens33";
         char src_ip[] = SRC_IP;
+        int ret;
 
         vtl_md_t *vtl_md;
         char err_buf[VTL_ERRBUF_SIZE];
+
+        struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+        if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+		perror("setrlimit(RLIMIT_MEMLOCK)");
+		return 1;
+	}
 
         /* Global shutdown handler */
 	signal(SIGINT, exit_application); 
@@ -52,37 +76,40 @@ int main(int argc, char const *argv[])
 
         }
 
-        /* Ouverture */
-        //TODO: change error message
-        FILE *rx_file = NULL;
-        rx_file = fopen("./files-receiver/lion.jpg", "ab");
-	if (rx_file == NULL) {
-		fprintf(stderr, "ERR: failed to open test file\n");
-                exit(EXIT_FAILURE);
-	}
-
         printf("\n");
         printf("Receiving data...");
+        /* vtl listen*/
+        ret = vtl_listen(vtl_md);
+        if (ret < 0) {
+                fprintf(stderr, "ERR: vtl_listen failed\n");
+                exit(EXIT_FAILURE);
+        }
+
+        uint8_t buf[DATASIZE];
+        ssize_t data_len;
         global_exit = false;
-        while (!global_exit)
-        {
-                vtl_rcv(vtl_md, rx_file);
+        while (!global_exit) {
+
+                data_len = vtl_rcv_perf(vtl_md, buf, DATASIZE);
+                recv_image_file(buf, data_len);
                 printf("Recv pkt: %d   Recv bytes: %d\r" 
 		, vtl_md->cnt_pkts, vtl_md->cnt_bytes);
 	        fflush(stdout);
+                
         }
         
         printf("Done\n");
         printf("\n");
+        vtl_listen_stop(vtl_md);
+        //TODO : perf_buffer__free(pb);
+
+
+
 
         //printf("Nbrs of received packets: %d pkts\n", cnt_pkt);
         // printf("Nbrs of received bytes: %d bytes\n", cnt_bytes);
         // printf("Loop cnt: %d",cnt_pkt);
-        printf("\n");
-
-	fclose(rx_file);
-
-        //TODO: vtl_destroy or vtl_close
+       
 
         return 0;
 }

@@ -12,6 +12,7 @@
 
 #define BPF_TC_FILENAME         "../src/bpf/bpf_tc.o"
 #define BPF_XDP_FILENAME        "../src/bpf/bpf_xdp.o"
+#define BPF_ARQ_FILENAME        "../src/bpf/bpf_arqin.o"
 
 #define INPUT_MODE             0x1
 #define OUTPUT_MODE            0x2     
@@ -81,6 +82,11 @@ void select_interface(char *interface)
         strcpy(interface, devs[n]);
 }
 
+void select_tf()
+{
+        
+}
+
 int deploy_tf(int mode)
 {
         int ret; //use it
@@ -101,8 +107,10 @@ int deploy_tf(int mode)
 
                 xdp_flags &= ~XDP_FLAGS_MODES;   /* Clear flags */
                 xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */             
-                ret = launcher_deploy_xdp_tf(&xdp_cfg, BPF_XDP_FILENAME, interface,
-                                       xdp_flags);
+                // ret = launcher_deploy_xdp_tf(&xdp_cfg, BPF_XDP_FILENAME, interface,
+                //                        xdp_flags);
+                ret = launcher_arqin_deploy(&xdp_cfg, BPF_ARQ_FILENAME, interface,
+                                                xdp_flags);
                 if (ret < 0) {
                         fprintf(stderr, "%s", xdp_cfg.err_buf);
                         fprintf(stderr, "ERR: launcher_deploy_xdp_tf failed\n");

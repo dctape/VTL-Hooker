@@ -20,16 +20,28 @@
 //WARN: Rentre en conflit avec netinet/ip.h
 //#include <linux/ip.h>
 
-#include "../../include/vtl/vtl_macros.h"
-#include "../../include/vtl/vtl_structures.h"
-
+#include "../../include/vtl.h"
 #include "../../src/common/xsk_user_helpers.h"
-#include "adaptor_receive.h"
+#include "adaptor.h"
 
 #define RX_BATCH_SIZE      		64
 
+void *alloc(size_t size)  /* extern ??*/
+{
+  void *new_mem;
+  if((new_mem = malloc(size)) == NULL)
+  {
+    printf("Out of memory!\n");
+    //exit(1);
+     return NULL;
+  }
+  return new_mem;
+}
+
+#define MALLOC(type,num) (type *)alloc((num) * sizeof(type))
+
 struct xsk_socket_info *
-adaptor_create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
+adaptor__create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 			int xsk_if_queue, struct xsk_umem_info *umem, char *err_buf)
 {
       void *packet_buffer;
@@ -92,28 +104,24 @@ bad:
 static bool 
 process_packet(struct xsk_socket_info *xsk, 
 		uint64_t addr, uint32_t len, 
-		FILE *rx_file,
-		uint32_t *cnt_pkts, uint32_t *cnt_bytes)
+		struct vtl_recv_params *rp)
 {	
 	uint32_t hdr_size;
 	uint32_t data_size;
 
-	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);
-	
+	/* Parsing */
+	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);	
 	struct ethhdr *eth = (struct ethhdr *) pkt;
 	struct iphdr *iph = (struct iphdr *)(eth + 1);
 	vtlhdr_t *vtlh = (vtlhdr_t *)(iph + 1);
 	uint8_t *data = (uint8_t*)(vtlh + 1); 
 
 	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(vtlhdr_t);
-	data_size = len - hdr_size;	
-	
-        //TODO: Make a linked list or a ring buffer ???
-	fwrite(data, 1, data_size, rx_file);
-	fflush(rx_file);
+	data_size = len - hdr_size;
 
-	*cnt_pkts += 1;
-	*cnt_bytes += data_size;
+	/* Call callback function */	
+	if (rp->recv_cb)
+		rp->recv_cb(rp->ctx, data, data_size);
 
 	return true;
 }
@@ -121,8 +129,7 @@ process_packet(struct xsk_socket_info *xsk,
 //TODO: Improve this
 static void 
 handle_receive_packets(struct xsk_socket_info *xsk, 
-			FILE *rx_file,
-			uint32_t *cnt_pkts, uint32_t *cnt_bytes)
+			struct vtl_recv_params *rp)
 {
 	unsigned int rcvd, stock_frames, i;
 	uint32_t idx_rx = 0, idx_fq = 0;
@@ -159,7 +166,7 @@ handle_receive_packets(struct xsk_socket_info *xsk,
 		uint64_t addr = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx)->addr;
 		uint32_t len = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx++)->len;
 
-		if (!process_packet(xsk, addr, len, rx_file, cnt_pkts, cnt_bytes))
+		if (!process_packet(xsk, addr, len, rp))
 			xsk_free_umem_frame(xsk, addr);
 
 		//xsk->stats.rx_bytes += len; //TODO : Est-ce nécessaire ??
@@ -174,9 +181,8 @@ handle_receive_packets(struct xsk_socket_info *xsk,
 
 //TODO: Revoir le code de retour
 void 
-adaptor_rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
-		FILE *rx_file,
-		uint32_t *cnt_pkts, uint32_t *cnt_bytes)
+adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
+		struct vtl_recv_params *rp)
 {	
 	// Pas trop bien compris...
 	struct pollfd fds[2];
@@ -194,121 +200,154 @@ adaptor_rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 			return; 
 	}
 		
-	handle_receive_packets(xsk_socket, rx_file, cnt_pkts, cnt_bytes);
+	handle_receive_packets(xsk_socket, rp);
 	
 }
 
-/** reception through perf_event buffer **/
+/****** reception through perf_event buffer *******/
 
-#define SAMPLE_SIZE	1530
+// #define SAMPLE_SIZE	1530
 
-// Enfiler
-void enqueue(struct perf_rcv_data_list *list, struct perf_rcv_data *frag)
-{
-	if( list->first == NULL &&  list->last == NULL) {
-		list->first = frag;
-		list->last = frag;
-	}
-	else {
-		list->last->next = frag;
-		list->last = frag;
-	}
-	list->len = list->len + 1;
+// // Enfiler
+// static void 
+// enqueue(struct perf_rcv_data_list *list, struct perf_rcv_data *frag)
+// {
+// 	if( list->first == NULL &&  list->last == NULL) {
+// 		list->first = frag;
+// 		list->last = frag;
+// 	}
+// 	else {
+// 		list->last->next = frag;
+// 		list->last = frag;
+// 	}
+// 	list->len = list->len + 1;
 
-}
+// }
 
-// défiler
-struct perf_rcv_data *
-dequeue(struct perf_rcv_data_list *list) 
-{
+// // défiler
+// static struct perf_rcv_data *
+// dequeue(struct perf_rcv_data_list *list) 
+// {
+// 	struct perf_rcv_data *frag;
+// 	frag = list->first;
+// 	list->first = list->first->next;
+// 	list->len = list->len - 1;
 
+// 	if (list->len == 0)
+// 	list->last = NULL;
+// 	return frag;
+// }
 
-}
+// // perf_event callback function
+// static void 
+// handle_perf_recv_pkts(void *ctx, int cpu, void *data, __u32 size)
+// {
+// 	vtl_md_t *vtl_md = (vtl_md_t *)ctx;
+// 	struct perf_rcv_data *rcv_data; 
+// 	struct {
+// 		__u16 cookie;
+// 		__u16 pkt_len;
+// 		__u8  pkt_data[SAMPLE_SIZE];
+// 	} *e = data; // __packed
 
-// perf_event callback function
-static void 
-handle_perf_recv_pkts(void *ctx, int cpu, void *data, __u32 size)
-{
-	vtl_md_t *vtl_md = (vtl_md_t *)ctx;
-	struct perf_rcv_data *rcv_data; 
-	struct {
-		__u16 cookie;
-		__u16 pkt_len;
-		__u8  pkt_data[SAMPLE_SIZE];
-	} *e = data; // __packed
+// 	uint16_t hdr_size;
+// 	uint16_t data_size;
 
-	uint16_t hdr_size;
-	uint16_t data_size;
+// 	if (e->cookie != 0xdead) {
+// 		printf("BUG cookie %x sized %d\n", e->cookie, size);
+// 		return;
+// 	}
 
-	if (e->cookie != 0xdead) {
-		printf("BUG cookie %x sized %d\n", e->cookie, size);
-		return;
-	}
+// 	struct ethhdr *eth = (struct ethhdr *)e->pkt_data;
+//         struct iphdr *iph = (struct iphdr *)(eth + 1);
+// 	vtlhdr_t *vtlh = (vtlhdr_t *)(iph + 1);
+// 	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) 
+// 			+ sizeof(vtlhdr_t);
+// 	data_size = e->pkt_len - hdr_size;
 
-	struct ethhdr *eth = (struct ethhdr *)e->pkt_data;
-        struct iphdr *iph = (struct iphdr *)(eth + 1);
-	vtlhdr_t *vtlh = (vtlhdr_t *)(iph + 1);
-	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) 
-			+ sizeof(vtlhdr_t);
-	data_size = e->pkt_len - hdr_size;
+// 	rcv_data->data = (uint8_t*)(vtlh + 1);
+// 	rcv_data->data_len = data_size;
 
-	rcv_data->data = (uint8_t*)(vtlh + 1);
-	rcv_data->data_len = data_size;
+// 	enqueue(vtl_md->rcv_data_list, rcv_data);
+// 	sem_post(&vtl_md->rcv_sem);
 
-	enqueue(vtl_md->rcv_data_list, rcv_data);
-	sem_post(&vtl_md->rcv_sem);
+// 	/** stats **/
+// 	vtl_md->cnt_pkts = vtl_md->cnt_pkts + 1;
+// 	vtl_md->cnt_bytes += data_size;
 
-}
+// }
 
-// thread function
-// TODO: Est-ce possible d'avoir de meilleurs codes d'erreur
-void * 
-thread_function (void *args)
-{
-	int err, ret;
-	struct perf_buffer_opts pb_opts = {0};
-	vtl_md_t *vtl_md = (vtl_md_t *)args; 
+// // thread function
+// // TODO: Est-ce possible d'avoir de meilleurs codes d'erreur
+// static void * 
+// thread_function (void *args)
+// {
+// 	int err, ret;
+// 	struct perf_buffer_opts pb_opts = {0};
+// 	vtl_md_t *vtl_md = (vtl_md_t *)args; 
 
-	pb_opts.sample_cb = handle_perf_recv_pkts;
-	pb_opts.ctx = vtl_md;
+// 	pb_opts.sample_cb = handle_perf_recv_pkts;
+// 	pb_opts.ctx = vtl_md;
 
-	vtl_md->pb = perf_buffer__new(vtl_md->perf_map_fd, 8, &pb_opts); // Pourquoi 8 ?
-	err = libbpf_get_error(vtl_md->pb);
-	if (err) {
-		perror("perf_buffer setup failed");
-		return NULL;
-	}
+// 	vtl_md->pb = perf_buffer__new(vtl_md->perf_map_fd, 8, &pb_opts); // Pourquoi 8 ?	
+// 	err = libbpf_get_error(vtl_md->pb);
+// 	if (err) {
+// 		perror("perf_buffer setup failed");
+// 		return NULL;
+// 	}
 
-	while ((ret = perf_buffer__poll(vtl_md->pb, 1000)) >= 0) {
-	}
+// 	while ((ret = perf_buffer__poll(vtl_md->pb, 1000)) >= 0) {
+// 	}
 
-	return NULL;
+// 	return NULL;
 
-}
+// }
 
-int 
-adaptor_listen_thread(vtl_md_t *vtl_md)
-{
-	int ret;
-	ret = pthread_create(&vtl_md->rcv_thread, NULL, thread_function, 
-			(void *)vtl_md);
-	if (ret != 0) {
-		perror("ERR: thread creation failed");
-		return -1;
-	}
+// int 
+// adaptor__listen_thread(vtl_md_t *vtl_md)
+// {
+// 	int ret;
+// 	ret = pthread_create(&vtl_md->rcv_thread, NULL, thread_function, 
+// 			(void *)vtl_md);
+// 	if (ret != 0) {
+// 		perror("ERR: thread creation failed");
+// 		return -1;
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }
 
-int
-adaptor_stop_listen_thread(vtl_md_t *vtl_md)
-{
-	int ret;
-	ret = pthread_cancel(&vtl_md->rcv_thread);
-	if (ret != 0) {
-		perror("ERR: thread cancel failed");
-		return -1;
-	}
+// int
+// adaptor__stop_listen_thread(vtl_md_t *vtl_md)
+// {
+// 	int ret;
+// 	ret = pthread_cancel(vtl_md->rcv_thread);
+// 	if (ret != 0) {
+// 		perror("ERR: thread cancel failed");
+// 		return -1;
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }
+
+// ssize_t
+// adaptor__rcv_perf_data(sem_t *sem, struct perf_rcv_data_list *rcv_list,
+// 			uint8_t *data)
+// {
+// 	struct perf_rcv_data *rcv_data;
+// 	sem_wait(sem);
+// 	rcv_data = dequeue(rcv_list);
+
+// 	data = rcv_data->data;
+// 	return rcv_data->data_len;
+// }
+
+// struct perf_rcv_data_list *
+// adaptor__init_rlist(void)
+// {
+// 	struct perf_rcv_data_list *list = NULL;
+// 	list = MALLOC(struct perf_rcv_data_list, 1);
+// 	memset(list, 0, sizeof(struct perf_rcv_data_list));
+// 	return list;
+
+// }
