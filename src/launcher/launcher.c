@@ -9,11 +9,9 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
-#include "../../include/vtl/vtl_macros.h"
-#include "../../include/vtl/vtl_structures.h"
-
 #include "../common/tc_user_helpers.h"
 #include "../common/xdp_user_helpers.h"
+#include "../../include/vtl.h"
 
 #include "launcher.h"
 

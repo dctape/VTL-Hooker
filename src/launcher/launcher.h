@@ -12,19 +12,19 @@
 
 
 int 
-launcher_deploy_tc_tf(struct tc_config *cfg, char *tf_file, char *interface, 
+launcher__deploy_tc(struct tc_config *cfg, char *bpf_file, char *interface, 
                         int flags);
 int 
-launcher_remove_tc_tf(struct tc_config *cfg, char *interface, int flags);
+launcher__remove_tc(struct tc_config *cfg, char *interface, int flags);
 
 int 
-launcher_deploy_xdp_tf(struct xdp_config *cfg, char *tf_file, char *ifname, 
+launcher__deploy_xdp_xsk(struct xdp_config *cfg, char *bpf_file, char *ifname, 
                         __u32 xdp_flags);
 int 
-launcher_remove_xdp_tf(char *ifname, __u32 xdp_flags);
+launcher__remove_xdp(char *ifname, __u32 xdp_flags);
 
 int
-launcher_arqin_deploy(struct xdp_config *cfg, char *arqin_file, char *ifname, 
+launcher__arqin_deploy(struct xdp_config *cfg, char *arqin_file, char *ifname, 
                         __u32 xdp_flags);
 
 #endif /* __LAUNCHER_H */
