@@ -8,7 +8,7 @@
 #include <string.h>
 
 //TODO: change to <api/api.h>
-#include <vtl/vtl.h>
+#include <vtl.h>
 
 #define DATASIZE              1024 // ideal size ? 1024 ? 16k ?
 
@@ -41,10 +41,25 @@ int main(int argc, char const *argv[])
 
         printf("Server starting\n");
 
+        int mode = VTL_MODE_OUT;
+
+        struct vtl_socket *sock;
+        sock = vtl_create_socket(mode, ifname, err_buf);
+        if (sock) {
+                fprintf(stderr, "%s\n", err_buf);
+                fprintf(stderr, "ERR: vtl_create_socket failed\n");
+                exit(EXIT_FAIL);
+        }
+
+        struct vtl_endpoint server = {0};
+        vtl_add_interface(&server, ifname);
+        vtl_add_ip4(&server, src_ip);
+
+
         /* Configurer l'objet vtl */
         // déterminer l'interface d'envoi de données
         // l'adresse ip src
-        int mode = VTL_MODE_OUT;
+        
         vtl_md = vtl_init(ifname, src_ip, mode, err_buf);
         if (vtl_md == NULL) {
                 fprintf(stderr, "%s", err_buf);

@@ -1,6 +1,6 @@
 
-TARGETS := server
-TARGETS += client
+TARGETS := server-stream
+TARGETS += client-stream
 TARGETS += client_perf
 
 OBJS = ${TARGETS:=.o}

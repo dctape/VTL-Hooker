@@ -7,13 +7,8 @@
 #include <linux/bpf.h>
 #include "bpf/bpf_helpers.h"
 
-#include "../../include/vtl/vtl_macros.h"
+#include "../../include/vtl_kern.h"
 
-typedef struct vtl_header vtlhdr_t;
-struct vtl_header
-{
-    uint16_t checksum;
-};
 
 struct bpf_map_def SEC("maps") xsks_map = {
     .type = BPF_MAP_TYPE_XSKMAP,

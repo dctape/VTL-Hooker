@@ -6,7 +6,7 @@
 #include <linux/ip.h>
 #include "bpf/bpf_helpers.h" 
 
-#include "../../include/vtl/vtl_macros.h"
+#include "../../include/vtl_kern.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
@@ -23,12 +23,6 @@
 #define SAMPLE_SIZE 64ul
 #define MAX_CPUS 128
 
-//TODO: Faire cette définition dans un fichier config ou util mais pas ici.
-typedef struct vtl_header vtlhdr_t;
-struct vtl_header
-{
-    uint16_t checksum;
-};
 
 struct bpf_map_def SEC("maps") my_map = {
 	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,

@@ -1,4 +1,4 @@
-BIN := vtl_ui
+BIN := dashboard
 OBJS := ${BIN:=.o}
 
 DEP_DIR = deps

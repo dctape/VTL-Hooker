@@ -114,13 +114,13 @@ static void dashboard__interface(char *interface)
         strcpy(interface, devs[n]);
 }
 
-static void populate_tf_array(char *tab)
-{
-       tab[1] = BPF_TC_FILENAME;
-       tab[2] = BPF_XDP_FILENAME;
-       tab[3] = BPF_ARQ_FILENAME;
+// static void populate_tf_array(char *tab)
+// {
+//        tab[1] = BPF_TC_FILENAME;
+//        tab[2] = BPF_XDP_FILENAME;
+//        tab[3] = BPF_ARQ_FILENAME;
         
-}
+// }
 
 static int deploy_basic(int mode, char *interface)
 {
@@ -181,17 +181,17 @@ static int deploy_basic(int mode, char *interface)
 
 }
 
-static int deploy_arq()
-{
+// static int deploy_arq()
+// {
 
-}
+// }
 
 static int dashboard__deploy(struct tr_function *tf)
 {
-        int ret;
+        int ret = -1;
         switch (tf->index) {
         case BASIC_TF /* index == 1 */ :
-                return deploy_basic(tf->mode, tf->interface);
+                ret = deploy_basic(tf->mode, tf->interface);
                 break;
         case ARQ_TF : /* index == 2 */
                 break;
@@ -199,19 +199,19 @@ static int dashboard__deploy(struct tr_function *tf)
                 break;
         }
 
+        return ret;
 }
 
 
 static int remove_basic(int mode, char *interface)
 {
-        int ret; //use it      
+        int ret;      
         int xdp_flags = 0;
         struct tc_config tc_cfg = {0};
 
         switch (mode)
         {
         case INPUT_MODE /* xdp */:
-                /* code */
 
                 /* Remove tf on selected interface */
                 printf("\n\nDeploying Basic TF on %s interface in input mode...", interface);
@@ -229,9 +229,6 @@ static int remove_basic(int mode, char *interface)
                 break;
         
         case OUTPUT_MODE /* tc */:
-
-                /* select interface */
-                select_interface(interface);
 
                 /* Remove tf on selected interface */
                 printf("\n\nRemoving Basic TF on %s interface in output mode...", interface);              
@@ -256,16 +253,18 @@ static int remove_basic(int mode, char *interface)
 
 static int dashboard__remove(struct tr_function *tf)
 {
-        int ret;
+        int ret = -1;
         switch (tf->index) {
         case BASIC_TF /* index == 1 */ :
-                return remove_basic(tf->mode, tf->interface);
+                ret = remove_basic(tf->mode, tf->interface);
                 break;
         case ARQ_TF : /* index == 2 */
                 break;
         default :
                 break;
         }
+
+        return ret;
 
 }
 
@@ -281,7 +280,6 @@ int main(int argc, char const *argv[])
         int ret;
 
         int menu_choice;
-        int mode;
         char enter = 0;
         char c;
 
@@ -294,7 +292,7 @@ int main(int argc, char const *argv[])
         do
         {
                 // start menu
-                menu_choice = menu_start();
+                menu_choice = dashboard__start();
                 clear_screen();
 
                 switch (menu_choice)

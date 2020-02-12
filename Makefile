@@ -11,7 +11,7 @@ MODULES := $(SRC_DIR)/api
 MODULES += $(SRC_DIR)/adaptor
 MODULES += $(SRC_DIR)/common
 MODULES += $(SRC_DIR)/launcher
-MODULES += $(SRC_DIR)/ui
+MODULES += $(SRC_DIR)/dashboard
 
 BIN_CLEAN = $(addsuffix _clean, $(BIN_DIR))
 MODULES_CLEAN = $(addsuffix _clean, $(MODULES))
@@ -25,7 +25,7 @@ LIBVTL_OBJS += $(SRC_DIR)/adaptor/*.o
 LIBVTL_OBJS += $(SRC_DIR)/common/*.o
 LIBVTL_OBJS += $(SRC_DIR)/launcher/*.o
 
-VTL_UI = $(BIN_DIR)/vtl_ui
+VTL_DASHBOARD = $(BIN_DIR)/vtl-dashboard
 
 
 CC := gcc
@@ -58,14 +58,14 @@ build-libtools: $(LIBTOOLS)
 build-bpfprog: $(BPFPROG_DIR)
 	@echo "Build bpf programs finished."
 
-build-modules: $(MODULES) build-libvtl build-vtlui
+build-modules: $(MODULES) build-libvtl build-dashboard
 	@echo "Build vtl modules finished."
 
 build-libvtl: $(STATIC_LIBVTL)
 	@echo "Build static libvtl finished."
 
-build-vtlui: $(VTL_UI)
-	@echo "Build vtl ui finished."
+build-dashboard: $(VTL_DASHBOARD)
+	@echo "Build vtl-dashboard finished."
 
 
 clean-bin: $(BIN_CLEAN)
@@ -87,14 +87,14 @@ $(LIBTOOLS) $(BPFPROG_DIR) $(MODULES): force
 $(STATIC_LIBVTL): $(LIBVTL_OBJS)
 	$(AR) $(ARFLAGS) $@ $?
 
-$(VTL_UI): $(SRC_DIR)/ui/vtl_ui.o $(LIBVTL_OBJS)
+$(VTL_DASHBOARD): $(SRC_DIR)/dashboard/dashboard.o $(LIBVTL_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBVTL_OBJS) $< $(LIBS)
 
 $(LIBTOOLS_CLEAN) $(BPFPROG_CLEAN) $(MODULES_CLEAN):
 	$(MAKE) -C $(subst _clean,,$@) clean
 
 $(BIN_CLEAN):
-	$(RM) $(STATIC_LIBVTL) $(VTL_UI)
+	$(RM) $(STATIC_LIBVTL) $(VTL_DASHBOARD)
 
 force :;
 

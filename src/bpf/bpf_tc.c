@@ -11,18 +11,7 @@
 #include "bpf/bpf_helpers.h"
 #include "bpf/tc_bpf_util.h"
 
-#include "../../include/vtl/vtl_macros.h"
-
-//TODO: replace later with vtl_structures.h
-// #include "../include/vtl/vtl_macros.h"
-// #include "../include/vtl/vtl_util.h"
-
-typedef struct vtl_header vtlhdr_t;
-struct vtl_header
-{
-
-        uint16_t checksum;
-};
+#include "../../include/vtl_kern.h"
 
 
 // #define MAX_IP_HDR_LEN          60
