@@ -23,8 +23,8 @@ launcher__deploy_xdp_xsk(struct xdp_config *cfg, char *bpf_file, char *ifname,
 int 
 launcher__remove_xdp(char *ifname, __u32 xdp_flags);
 
-int
-launcher__arqin_deploy(struct xdp_config *cfg, char *arqin_file, char *ifname, 
-                        __u32 xdp_flags);
+// int
+// launcher__arqin_deploy(struct xdp_config *cfg, char *arqin_file, char *ifname, 
+//                         __u32 xdp_flags);
 
 #endif /* __LAUNCHER_H */

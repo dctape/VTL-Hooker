@@ -17,14 +17,22 @@
 #define INPUT_MODE             0x1
 #define OUTPUT_MODE            0x2     
 
-int menu_start(void)
+struct transport_func {
+
+        int index; /* Index dans le tableau des TFs */
+        int mode; /* mode de déploiement */
+        char interface[20];
+
+};
+
+int dashboard__start(void)
 {
         int choice;
-        printf("\n\tKTF Orchestrator menu\n\n");
+        printf("\n\tVTL Dashboard\n\n");
         printf("Choose from the options given below\n");
-        printf("->> 1- Deploy TF\n");
-        printf("->> 2- Remove TF\n");
-        printf("->> 3- Exit KTF Orchestrator\n\n");
+        printf("->> 1- Deploy a Transport Function\n");
+        printf("->> 2- Remove a Transport Function\n"); // display deployed transport function
+        printf("->> 3- Exit VTL Dashboard\n\n");
 
         printf("Enter your choice: ");
         scanf("%d", &choice);
@@ -33,10 +41,27 @@ int menu_start(void)
 
 }
 
-int menu_mode(void)
+int dashboard__list_tf(void)
 {
         int choice;
-        printf("\n\tKTF Orchestrator\n\n");
+        printf("\n\tVTL Dashboard\n\n");
+        printf("Choose a transport function:\n");
+        printf("->> 1- Basic TF\n");
+        printf("->> 2- ARQ TF\n\n");
+        
+        //3- return to menu start
+
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        return choice;
+
+}
+
+int dashboard__mode(void)
+{
+        int choice;
+        printf("\n\tVTL Dashboard\n\n");
         printf("Choose mode:\n");
         printf("->> 1- Input mode (reception ~~ XDP)\n");
         printf("->> 2- Output mode (emission ~~ TC)\n\n");
@@ -50,7 +75,10 @@ int menu_mode(void)
 
 }
 
-void select_interface(char *interface)
+
+
+
+static void dashboard__interface(char *interface)
 {
         pcap_if_t *alldevsp, *device;
         char errbuf[100], devs[100][100];
@@ -82,12 +110,16 @@ void select_interface(char *interface)
         strcpy(interface, devs[n]);
 }
 
-void select_tf()
+static void populate_tf_array(char *tab)
 {
+       tab[1] = BPF_TC_FILENAME;
+       tab[2] = BPF_XDP_FILENAME;
+       tab[3] = BPF_ARQ_FILENAME;
         
 }
 
-int deploy_tf(int mode)
+
+static int dashboard__deploy(int mode)
 {
         int ret; //use it
         char interface[20];
@@ -109,6 +141,7 @@ int deploy_tf(int mode)
                 xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */             
                 // ret = launcher_deploy_xdp_tf(&xdp_cfg, BPF_XDP_FILENAME, interface,
                 //                        xdp_flags);
+                // Call launcher function
                 ret = launcher_arqin_deploy(&xdp_cfg, BPF_ARQ_FILENAME, interface,
                                                 xdp_flags);
                 if (ret < 0) {
@@ -126,6 +159,7 @@ int deploy_tf(int mode)
                 /* deploy tf on selected interface */
                 printf("\n\nDeploying TF on %s interface in output mode...", interface);
                 
+                //Call launcher function
                 ret = launcher_deploy_tc_tf(&tc_cfg, BPF_TC_FILENAME, interface,
                                     TC_EGRESS_ATTACH);
                 if (ret < 0) {
@@ -149,7 +183,7 @@ int deploy_tf(int mode)
         return 0;
 }
 
-int remove_tf(int mode)
+static int remove_tf(int mode)
 {
         int ret; //use it
         char interface[20];
@@ -207,7 +241,7 @@ int remove_tf(int mode)
 
 }
 
-void clear_screen(void)
+static void clear_screen(void)
 {
     //system("cls||clear");
     system("clear");
@@ -223,6 +257,10 @@ int main(int argc, char const *argv[])
         char enter = 0;
         char c;
 
+        struct transport_func tf;
+
+        /* Temporary: Call VTL Initializer */
+        
         clear_screen();
 
         do
@@ -236,7 +274,10 @@ int main(int argc, char const *argv[])
                 case 1 /* Deploy TF*/:
                         
                         //TODO: Display TF list
-                        mode = menu_mode();
+                        
+                        tf.index = dashboard__list_tf();
+                        tf.mode = dashboard__mode();
+                        dashboard__interface(tf.interface);
     
                         ret = deploy_tf(mode);
                         if (ret < 0) {
