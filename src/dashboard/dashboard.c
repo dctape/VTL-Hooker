@@ -10,14 +10,18 @@
 
 #include "../launcher/launcher.h"
 
+#define BASIC_TF        1
+#define ARQ_TF          2
+
 #define BPF_TC_FILENAME         "../src/bpf/bpf_tc.o"
 #define BPF_XDP_FILENAME        "../src/bpf/bpf_xdp.o"
 #define BPF_ARQ_FILENAME        "../src/bpf/bpf_arqin.o"
 
 #define INPUT_MODE             0x1
-#define OUTPUT_MODE            0x2     
+#define OUTPUT_MODE            0x2
+#define INOUT_MODE             0x3     
 
-struct transport_func {
+struct tr_function {
 
         int index; /* Index dans le tableau des TFs */
         int mode; /* mode de déploiement */
@@ -118,32 +122,26 @@ static void populate_tf_array(char *tab)
         
 }
 
-
-static int dashboard__deploy(int mode)
+static int deploy_basic(int mode, char *interface)
 {
         int ret; //use it
-        char interface[20];
-        
+
         int xdp_flags = 0;
         struct xdp_config xdp_cfg = {0};
-
         struct tc_config tc_cfg = {0};
 
         switch (mode)
         {
-        case INPUT_MODE /* xdp */:
-        
-                select_interface(interface);               
+        case INPUT_MODE /* xdp */:               
 
-                printf("\n\nDeploying TF on %s interface in input mode...", interface);
-
+                printf("\n\nDeploying Basic TF on %s interface in input mode...", interface);
+                
+                //TODO : Put it globals
                 xdp_flags &= ~XDP_FLAGS_MODES;   /* Clear flags */
                 xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */             
-                // ret = launcher_deploy_xdp_tf(&xdp_cfg, BPF_XDP_FILENAME, interface,
-                //                        xdp_flags);
+                ret = launcher__deploy_xdp_xsk(&xdp_cfg, BPF_XDP_FILENAME, interface,
+                                       xdp_flags);
                 // Call launcher function
-                ret = launcher_arqin_deploy(&xdp_cfg, BPF_ARQ_FILENAME, interface,
-                                                xdp_flags);
                 if (ret < 0) {
                         fprintf(stderr, "%s", xdp_cfg.err_buf);
                         fprintf(stderr, "ERR: launcher_deploy_xdp_tf failed\n");
@@ -153,14 +151,13 @@ static int dashboard__deploy(int mode)
 
                 break;
         
-        case 2 /* Output mode = tc */:
+        case OUTPUT_MODE /* Output mode = tc */:
         {
-                select_interface(interface);
-                /* deploy tf on selected interface */
-                printf("\n\nDeploying TF on %s interface in output mode...", interface);
+
+                printf("\n\nDeploying Basic TF on %s interface in output mode...", interface);
                 
                 //Call launcher function
-                ret = launcher_deploy_tc_tf(&tc_cfg, BPF_TC_FILENAME, interface,
+                ret = launcher__deploy_tc(&tc_cfg, BPF_TC_FILENAME, interface,
                                     TC_EGRESS_ATTACH);
                 if (ret < 0) {
                         fprintf(stderr, "%s", tc_cfg.err_buf);
@@ -181,13 +178,33 @@ static int dashboard__deploy(int mode)
         }
 
         return 0;
+
 }
 
-static int remove_tf(int mode)
+static int deploy_arq()
 {
-        int ret; //use it
-        char interface[20];
-        
+
+}
+
+static int dashboard__deploy(struct tr_function *tf)
+{
+        int ret;
+        switch (tf->index) {
+        case BASIC_TF /* index == 1 */ :
+                return deploy_basic(tf->mode, tf->interface);
+                break;
+        case ARQ_TF : /* index == 2 */
+                break;
+        default :
+                break;
+        }
+
+}
+
+
+static int remove_basic(int mode, char *interface)
+{
+        int ret; //use it      
         int xdp_flags = 0;
         struct tc_config tc_cfg = {0};
 
@@ -196,22 +213,18 @@ static int remove_tf(int mode)
         case INPUT_MODE /* xdp */:
                 /* code */
 
-                /* select interface */
-                select_interface(interface);
-
                 /* Remove tf on selected interface */
-                printf("\n\nDeploying TF on %s interface in input mode...", interface);
+                printf("\n\nDeploying Basic TF on %s interface in input mode...", interface);
                 
                 xdp_flags &= ~XDP_FLAGS_MODES;   /* Clear flags */
                 xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */
-                ret = launcher_remove_xdp_tf(interface, xdp_flags);
+                ret = launcher__remove_xdp(interface, xdp_flags);
                 if (ret < 0) {
                         fprintf(stderr, "ERR: launcher_remove_xdp_tf failed\n");
                         return -1;
                 }
 
                 printf("Success\n");
-
 
                 break;
         
@@ -221,8 +234,8 @@ static int remove_tf(int mode)
                 select_interface(interface);
 
                 /* Remove tf on selected interface */
-                printf("\n\nRemoving TF on %s interface in output mode...", interface);              
-                ret = launcher_remove_tc_tf(&tc_cfg, interface, TC_EGRESS_ATTACH);
+                printf("\n\nRemoving Basic TF on %s interface in output mode...", interface);              
+                ret = launcher__remove_tc(&tc_cfg, interface, TC_EGRESS_ATTACH);
                 if (ret < 0) {
                         fprintf(stderr, "ERR: launcher_remove_tc_tf failed\n");
                         return -1;
@@ -238,6 +251,21 @@ static int remove_tf(int mode)
         }
 
         return 0;
+
+}
+
+static int dashboard__remove(struct tr_function *tf)
+{
+        int ret;
+        switch (tf->index) {
+        case BASIC_TF /* index == 1 */ :
+                return remove_basic(tf->mode, tf->interface);
+                break;
+        case ARQ_TF : /* index == 2 */
+                break;
+        default :
+                break;
+        }
 
 }
 
@@ -257,7 +285,7 @@ int main(int argc, char const *argv[])
         char enter = 0;
         char c;
 
-        struct transport_func tf;
+        struct tr_function tf;
 
         /* Temporary: Call VTL Initializer */
         
@@ -278,8 +306,7 @@ int main(int argc, char const *argv[])
                         tf.index = dashboard__list_tf();
                         tf.mode = dashboard__mode();
                         dashboard__interface(tf.interface);
-    
-                        ret = deploy_tf(mode);
+                        ret = dashboard__deploy(&tf);
                         if (ret < 0) {
                                 menu_choice = 3;
                                 break;
@@ -295,8 +322,9 @@ int main(int argc, char const *argv[])
 
                         break;
                 case 2 /* Remove TF */:
-                        mode = menu_mode();
-                        ret = remove_tf(mode);
+                        tf.mode = dashboard__mode();
+                        dashboard__interface(tf.interface);
+                        ret = dashboard__remove(&tf);
                         if (ret < 0) {
                                 menu_choice = 3;
                                 break;
