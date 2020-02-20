@@ -25,7 +25,7 @@ clean:
 	$(RM) -r $(DEP_DIR)
 
 $(OBJS):%.o: %.c $(DEP_DIR)/%.d Makefile
-	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $< 
 	mv -f $(DEP_DIR)/$*.Td $(DEP_DIR)/$*.d
 
 

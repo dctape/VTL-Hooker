@@ -43,6 +43,7 @@ LDFLAGS ?= -L$(LIBBPF_DIR)
 
 LIBS := -l:libbpf.a -lelf 
 LIBS += -lpcap -lpthread
+LIBS += -lcurses #pour le dashboard
 
 all: build
 	@echo "Build finished."

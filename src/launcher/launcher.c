@@ -28,7 +28,7 @@ int perf_map_fd;
   * 
 */ 
 int
-launcher__deploy_tc(struct tc_config *cfg, char *bpf_file, char *interface, int flags)
+launcher__deploy_tc(struct tc_config *cfg, const char *bpf_file, char *interface, int flags)
 {
         int ifindex = if_nametoindex(interface);    
         
@@ -136,7 +136,7 @@ launcher__remove_tc(struct tc_config *cfg, char *interface, int flags)
 */
 // TODO: put err_buf as parameter 
 int 
-launcher__deploy_xdp_xsk(struct xdp_config *cfg, char *bpf_file, char *ifname, 
+launcher__deploy_xdp_xsk(struct xdp_config *cfg, const char *bpf_file, char *ifname, 
                         __u32 xdp_flags)
 {       
 

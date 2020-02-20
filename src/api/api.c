@@ -138,6 +138,26 @@ vtl_add_hostname(struct vtl_endpoint *endpoint, char *hostname)
 }
 
 /*** Fonctions de gestion d'un canal de communication VTL ***/
+
+static void
+vtl_allocate_buf(struct vtl_channel *ch, int mode)
+{
+        // allocation buf according sock type
+        switch (mode) {
+        case VTL_MODE_INOUT:
+        case VTL_MODE_IN :
+                ch->rcvbuf->rcv_data = allocate_ustrmem(VTL_DATA_SIZE);
+                if (mode != VTL_MODE_INOUT)
+                        break;
+        case VTL_MODE_OUT:
+                ch->sndbuf->ip_flags = allocate_intmem(4);
+                ch->sndbuf->snd_data = allocate_ustrmem(VTL_DATA_SIZE);
+                ch->sndbuf->snd_packet = allocate_ustrmem (IP_MAXPACKET);
+                break;
+
+        }
+
+}
 struct vtl_channel *
 vtl_open_channel(struct vtl_socket *sock, 
                 struct vtl_endpoint *local,
@@ -164,20 +184,8 @@ vtl_open_channel(struct vtl_socket *sock,
         ch->local = local;
         ch->remote = remote;
 
-        // allocation rcvbuf according sock type
-        switch (sock->mode) {
-        case VTL_MODE_INOUT:
-        case VTL_MODE_IN :
-                ch->rcvbuf->rcv_data = allocate_ustrmem(VTL_DATA_SIZE);
-                if (sock->mode != VTL_MODE_INOUT)
-                        break;
-        case VTL_MODE_OUT:
-                ch->sndbuf->ip_flags = allocate_intmem(4);
-                ch->sndbuf->snd_data = allocate_ustrmem(VTL_DATA_SIZE);
-                ch->sndbuf->snd_packet = allocate_ustrmem (IP_MAXPACKET);
-                break;
-
-        }
+        // allocation buf according sock type
+        vtl_allocate_buf(ch, sock->mode);
 
         /** vtl negotiation **/
 
@@ -191,11 +199,48 @@ vtl_open_channel(struct vtl_socket *sock,
 
 // }
 
-// struct vtl_channel *
-// vtl_accept()
-// {
+// Puisque nous sommes pour l'instant dans l'incapacité 
+// de faire la négociation.
+// On renseigne en dur les informations du client.
+struct vtl_channel *
+vtl_accept_channel(struct vtl_socket *sock,
+                   struct vtl_endpoint *local,
+                   struct vtl_endpoint *remote,
+                   int flags,
+                   char *err_buf)
+{
+        /* Processing vtl negotiation */
 
-// }
+        /**
+         * if negotiation succeed then create a
+         * vtl channel.
+         * 
+         **/
+
+        struct vtl_channel *ch = NULL;
+        ch = malloc(sizeof(struct vtl_channel));
+        memset(ch, 0, sizeof(struct vtl_channel));
+
+        // Test before assignment
+        if (local == NULL && remote == NULL){
+                snprintf(err_buf, VTL_ERRBUF_SIZE,
+                "ERR: Endpoints not correct\n");
+                return NULL;
+        }
+        else if(local == NULL && flags == VTL_LOCAL_AUTOFILL) {
+                //auto fill local endpoint
+                //TODO : get automatically ip src
+                strcpy(local->in_addr, IP_SRC_VM);
+        }
+        ch->local = local;
+        ch->remote = remote;
+
+        // allocation buf according sock type
+        vtl_allocate_buf(ch, sock->mode); 
+
+        return ch;
+
+}
 
 /*** Fonctions d'émission et de réception ***/
 int

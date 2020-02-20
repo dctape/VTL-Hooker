@@ -41,8 +41,8 @@ int main(int argc, char const *argv[])
 
         printf("Server starting\n");
 
+        /* VTL Preparation */ 
         int mode = VTL_MODE_OUT;
-
         struct vtl_socket *sock;
         sock = vtl_create_socket(mode, ifname, err_buf);
         if (sock) {
@@ -50,10 +50,19 @@ int main(int argc, char const *argv[])
                 fprintf(stderr, "ERR: vtl_create_socket failed\n");
                 exit(EXIT_FAIL);
         }
-
+        
+        /* Configure endpoint */
         struct vtl_endpoint server = {0};
         vtl_add_interface(&server, ifname);
         vtl_add_ip4(&server, src_ip);
+
+        /* Waiting connexions */
+        //vtl_accept();
+
+        /* listen over a channel */
+        // For now, call vtl_open_channel server side or client side
+        struct vtl_channel *ch = NULL;
+        
 
 
         /* Configurer l'objet vtl */

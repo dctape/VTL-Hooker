@@ -112,6 +112,14 @@ void vtl_add_hostname(struct vtl_endpoint *endpoint, char *hostname);
 struct vtl_channel *vtl_open_channel(struct vtl_socket *sock, struct vtl_endpoint *local,
                                         struct vtl_endpoint *remote, int flags, char *err_buf);
 
+//Temporary
+struct vtl_channel *vtl_accept_channel(struct vtl_socket *sock,
+                   struct vtl_endpoint *local,
+                   struct vtl_endpoint *remote,
+                   int flags,
+                   char *err_buf);
+
+
 int vtl_send(struct vtl_socket *sock, struct vtl_channel *ch, uint8_t *data, 
         size_t datalen, char *err_buf);
 
