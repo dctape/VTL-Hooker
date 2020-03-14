@@ -27,6 +27,8 @@
                 "vtl_macros.h": "c",
                 "adaptor_receive.h": "c",
                 "in.h": "c",
-                "util.h": "c"
+                "util.h": "c",
+                "bpf_endian.h": "c",
+                "bpf_helpers.h": "c"
         }
 }

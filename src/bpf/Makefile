@@ -3,6 +3,7 @@ ROOT_DIR = ../../
 BPF_TARGETS := bpf_tc.o
 BPF_TARGETS += bpf_xdp.o
 BPF_TARGETS += bpf_arqin.o
+BPF_TARGETS += bpf_hooker.o
 
 INCLUDE_BPF = include
 INCLUDE_VTL = $(ROOT_DIR)/include/vtl
