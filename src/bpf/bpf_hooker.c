@@ -43,30 +43,33 @@ struct sock_cookie {
 };
 
 
-struct bpf_map_def SEC("maps") LEG_APP_MAP = {
+struct bpf_map_def SEC("maps") SOCK_MAP = {
         .type = BPF_MAP_TYPE_SOCKHASH,
         .key_size = sizeof(struct sock_key),
         .value_size = sizeof(int) ,
         .max_entries = LEGMAP_SIZE
 };
 
-struct bpf_map_def SEC("maps") LEG_ADDR_MAP = {
+struct bpf_map_def SEC("maps") COOKIE_MAP = {
         .type = BPF_MAP_TYPE_HASH,
         .key_size = sizeof(struct sock_key),
         .value_size = sizeof(struct sock_cookie),
         .max_entries = LEGMAP_SIZE
 };
 
-struct bpf_map_def SEC("maps") SK_STORAGE_MAP = {
-        .type = BPF_MAP_TYPE_SK_STORAGE,
-        .key_size = sizeof(int),
-        .value_size = sizeof(struct sock_cookie),
-        .map_flags = BPF_F_NO_PREALLOC
-};
+// struct bpf_map_def SEC("maps") SK_STORAGE_MAP = {
+//         .type = BPF_MAP_TYPE_SK_STORAGE,
+//         .key_size = sizeof(int),
+//         .value_size = sizeof(struct sock_cookie),
+//         .map_flags = BPF_F_NO_PREALLOC
+// };
 
 
-
-void legapp_register(struct bpf_sock_ops *skops)
+/** 
+ * 1 - Enregistre les informations d'adressage
+ * 2 - Enregistre la socket dans la sockmap (LEG_APP_MAP) 
+*/
+static __always_inline void legapp_register(struct bpf_sock_ops *skops)
 {
 
         struct sock_cookie cookie = {0};
@@ -82,10 +85,10 @@ void legapp_register(struct bpf_sock_ops *skops)
         cookie.key = bpf_get_socket_cookie(skops);
         
         /* 1- save addr */
-        bpf_map_update_elem(&LEG_ADDR_MAP, &skey, &cookie, BPF_ANY);
+        bpf_map_update_elem(&COOKIE_MAP, &skey, &cookie, BPF_ANY);
 
         /* 2- save app in sockmap */
-        bpf_sock_hash_update(skops, &LEG_APP_MAP, &skey, BPF_NOEXIST);
+        bpf_sock_hash_update(skops, &SOCK_MAP, &skey, BPF_NOEXIST);
 }
 
 SEC("sockops")
@@ -113,7 +116,7 @@ int hooker_monitor(struct bpf_sock_ops *skops)
 }
 
 SEC("sk_msg")
-int hooker_redirector(struct sk_msg_md *msg) // TODO : use a better name...
+int hooker_redirect(struct sk_msg_md *msg) // TODO : use a better name...
 {
         
         
@@ -145,18 +148,18 @@ int hooker_redirector(struct sk_msg_md *msg) // TODO : use a better name...
                 skey.dport = msg->remote_port;
                 skey.sport = bpf_htonl(msg->local_port);
 
-                cookie = bpf_map_lookup_elem(&SK_STORAGE_MAP, &skey);
+                cookie = bpf_map_lookup_elem(&COOKIE_MAP, &skey);
                 if (!cookie)
                         return SK_DROP;
                 
                 /* Ajout du cookie aux données */
                 //void *data_end = (void *)(long)msg->data_end;
-                void *data = (void *)(long)msg->data;
-                bpf_msg_push_data(msg, 0, sizeof(cookie->key), 0);
-                __builtin_memcpy(data, &cookie->key, sizeof(cookie->key));
+                // void *data = (void *)(long)msg->data;
+                // bpf_msg_push_data(msg, 0, sizeof(cookie->key), 0);
+                // __builtin_memcpy(data, &cookie->key, sizeof(cookie->key));
 
                 /* redirection vers le hooker */
-                bpf_msg_redirect_hash(msg, &LEG_APP_MAP, &hkey, flags);
+                bpf_msg_redirect_hash(msg, &SOCK_MAP, &hkey, flags);
         }     
 
         // switch (lport)

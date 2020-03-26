@@ -2,6 +2,7 @@ OBJS := util.o
 OBJS += tc_user_helpers.o
 OBJS += xdp_user_helpers.o
 OBJS += xsk_user_helpers.o
+OBJS += cgroup_helpers.o
 
 
 DEP_DIR = deps
