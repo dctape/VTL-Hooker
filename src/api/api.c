@@ -53,7 +53,7 @@ vtl_create_outsock(char *err_buf)
 }
 
 struct vtl_socket *
-vtl_create_socket(int mode, char *ifname, char *err_buf)
+vtl_create_socket(enum vtl_use_mode mode, char *ifname, char *err_buf)
 {
         struct vtl_socket *sock = NULL;
         sock = malloc(sizeof(struct vtl_socket));
@@ -64,21 +64,21 @@ vtl_create_socket(int mode, char *ifname, char *err_buf)
         }
         memset(sock, 0, sizeof(struct vtl_socket));
 
-        sock->mode = mode;
+        //sock->mode = mode;
 
         /* Socket creation according mode */
-        switch (sock->mode) {
+        switch (mode) {
         
-        case VTL_MODE_INOUT:
-        case VTL_MODE_IN :
+        case VTL_USE_MODE_INOUT:
+        case VTL_USE_MODE_IN :
                 sock->xsk_socket = vtl_create_insock(ifname, err_buf);
                 if (sock->xsk_socket == NULL)
                         return NULL;
                 
-                if (sock->mode != VTL_MODE_INOUT)
+                if (mode != VTL_USE_MODE_INOUT)
                         break;
 
-        case VTL_MODE_OUT:
+        case VTL_USE_MODE_OUT:
                 sock->af_inet_sock = vtl_create_outsock(err_buf);
                 if (sock->af_inet_sock < 0)
                         return NULL;
@@ -103,24 +103,48 @@ vtl_close_socket(struct vtl_socket *sock)
                 xsk_socket__delete(sock->xsk_socket->xsk);
 
         // TODO: CLose af_inet descriptor
+
+        free(sock);
 }
 
+struct vtl_ctx *
+vtl_init_ctx(enum vtl_use_mode mode, char *ifname, char *err_buf)
+{
+        struct vtl_ctx *ctx = NULL;
+        ctx = malloc(sizeof(struct vtl_ctx));
+        //TODO: Verify that sizeof(ifname) < sizeof(endpoint->ifname)
+        // Signal an error when verification failed 
+        strcpy(ctx->ifname, ifname);
+        ctx->sock = vtl_create_socket(mode, ifname, err_buf);
+        if (!ctx->sock)
+                return NULL; // Signaler l'échec de la création de vtl_socket
+        
+        return ctx;
+}
+
+void
+vtl_destroy_ctx(struct vtl_ctx *ctx)
+{
+        //TODO : test ep
+        vtl_close_socket(ctx->sock);
+        free(ctx);
+}
 /*** Fonctions de gestion d'un vtl_endpoint ***/
+// void
+// vtl_add_interface(struct vtl_endpoint *endpoint, char *ifname)
+// {
+//         //TODO: Verify that sizeof(ifname) < sizeof(endpoint->ifname)
+//         // Signal an error when verification failed
+//         strcpy(endpoint->ifname, ifname);
+
+// }
+
 void
-vtl_add_interface(struct vtl_endpoint *endpoint, char *ifname)
+vtl_add_ip4(struct vtl_endpoint *ep, char *in_addr)
 {
         //TODO: Verify that sizeof(ifname) < sizeof(endpoint->ifname)
         // Signal an error when verification failed
-        strcpy(endpoint->ifname, ifname);
-
-}
-
-void
-vtl_add_ip4(struct vtl_endpoint *endpoint, char *in_addr)
-{
-        //TODO: Verify that sizeof(ifname) < sizeof(endpoint->ifname)
-        // Signal an error when verification failed
-        strcpy(endpoint->in_addr, in_addr);
+        strcpy(ep->in_addr, in_addr);
 }
 
 // void
@@ -130,26 +154,26 @@ vtl_add_ip4(struct vtl_endpoint *endpoint, char *in_addr)
 // }
 
 void
-vtl_add_hostname(struct vtl_endpoint *endpoint, char *hostname)
+vtl_add_hostname(struct vtl_endpoint *ep, char *hostname)
 {
         //TODO: Verify that sizeof(ifname) < sizeof(endpoint->ifname)
         // Signal an error when verification failed
-        strcpy(endpoint->hostname, hostname);
+        strcpy(ep->hostname, hostname);
 }
 
 /*** Fonctions de gestion d'un canal de communication VTL ***/
 
 static void
-vtl_allocate_buf(struct vtl_channel *ch, int mode)
+vtl_alloc_buf(struct vtl_channel *ch, enum vtl_use_mode mode)
 {
         // allocation buf according sock type
         switch (mode) {
-        case VTL_MODE_INOUT:
-        case VTL_MODE_IN :
+        case VTL_USE_MODE_INOUT:
+        case VTL_USE_MODE_IN :
                 ch->rcvbuf->rcv_data = allocate_ustrmem(VTL_DATA_SIZE);
-                if (mode != VTL_MODE_INOUT)
+                if (mode != VTL_USE_MODE_INOUT)
                         break;
-        case VTL_MODE_OUT:
+        case VTL_USE_MODE_OUT:
                 ch->sndbuf->ip_flags = allocate_intmem(4);
                 ch->sndbuf->snd_data = allocate_ustrmem(VTL_DATA_SIZE);
                 ch->sndbuf->snd_packet = allocate_ustrmem (IP_MAXPACKET);
@@ -159,7 +183,7 @@ vtl_allocate_buf(struct vtl_channel *ch, int mode)
 
 }
 struct vtl_channel *
-vtl_open_channel(struct vtl_socket *sock, 
+vtl_open_channel(struct vtl_ctx *ctx, 
                 struct vtl_endpoint *local,
                 struct vtl_endpoint *remote,
                 int flags,
@@ -184,8 +208,8 @@ vtl_open_channel(struct vtl_socket *sock,
         ch->local = local;
         ch->remote = remote;
 
-        // allocation buf according sock type
-        vtl_allocate_buf(ch, sock->mode);
+        // allocation buf according choosen mode
+        vtl_alloc_buf(ch, ctx->mode);
 
         /** vtl negotiation **/
 
@@ -203,7 +227,7 @@ vtl_open_channel(struct vtl_socket *sock,
 // de faire la négociation.
 // On renseigne en dur les informations du client.
 struct vtl_channel *
-vtl_accept_channel(struct vtl_socket *sock,
+vtl_accept_channel(struct vtl_ctx *ctx,
                    struct vtl_endpoint *local,
                    struct vtl_endpoint *remote,
                    int flags,
@@ -236,7 +260,7 @@ vtl_accept_channel(struct vtl_socket *sock,
         ch->remote = remote;
 
         // allocation buf according sock type
-        vtl_allocate_buf(ch, sock->mode); 
+        vtl_alloc_buf(ch, ctx->mode); 
 
         return ch;
 
@@ -244,7 +268,7 @@ vtl_accept_channel(struct vtl_socket *sock,
 
 /*** Fonctions d'émission et de réception ***/
 int
-vtl_send(struct vtl_socket *sock, struct vtl_channel *ch,
+vtl_send(struct vtl_ctx *ctx, struct vtl_channel *ch,
         uint8_t *data, size_t datalen,
         char *err_buf)
 {
@@ -256,12 +280,17 @@ vtl_send(struct vtl_socket *sock, struct vtl_channel *ch,
 
         //TODO: Revoir cette partie
         /* send vtl packet */
-        ret = adaptor__send_packet(sock->af_inet_sock, ch->sndbuf->snd_packet,
-                                &ch->sndbuf->vtlh, &ch->sndbuf->iphdr,
-                                ch->remote->hostname, ch->remote->in_addr,
-                                ch->local->in_addr, ch->sndbuf->ip_flags,
-                                ch->sndbuf->snd_data, ch->sndbuf->snd_datalen,
-                                err_buf);
+        ret = adaptor__send_packet(ctx->sock->af_inet_sock, 
+                                   ch->sndbuf->snd_packet,
+                                   &ch->sndbuf->vtlh, 
+                                   &ch->sndbuf->iphdr,
+                                   ch->remote->hostname, 
+                                   ch->remote->in_addr,
+                                   ch->local->in_addr, 
+                                   ch->sndbuf->ip_flags,
+                                   ch->sndbuf->snd_data, 
+                                   ch->sndbuf->snd_datalen,
+                                   err_buf);
         
         if (ret < 0) 
                 return -1;
@@ -273,9 +302,11 @@ vtl_send(struct vtl_socket *sock, struct vtl_channel *ch,
 }
 
 void 
-vtl_receive(struct vtl_socket *sock, struct vtl_recv_params *rp)
+vtl_receive(struct vtl_ctx *ctx, struct vtl_recv_params *rp)
 {
-        adaptor__rcv_data(sock->xsk_socket, sock->xsk_poll_mode, rp);
+        adaptor__rcv_data(ctx->sock->xsk_socket, 
+                         ctx->sock->xsk_poll_mode,
+                         rp);
 }
 
 

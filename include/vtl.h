@@ -48,6 +48,18 @@ struct vtl_socket {
 #define VTL_MODE_INOUT             0x3
 
 };
+//Est-ce que ç'a du sens ?
+enum vtl_use_mode {
+        VTL_USE_MODE_IN,
+        VTL_USE_MODE_OUT,
+        VTL_USE_MODE_INOUT,
+};
+
+struct vtl_ctx {
+        struct vtl_socket *sock;
+        enum vtl_use_mode mode;
+        char ifname[IF_NAMESIZE];
+};
 
 struct vtl_endpoint {
 
@@ -55,8 +67,7 @@ struct vtl_endpoint {
         char hostname[40];
         char in_addr[INET_ADDRSTRLEN];
         char in6_addr[INET6_ADDRSTRLEN];
-        char ifname[IF_NAMESIZE];
-
+        //char ifname[IF_NAMESIZE];
 };
 
 /* En-tête de paquet vtl */
@@ -98,31 +109,35 @@ struct vtl_recv_params {
         void *ctx;
 };
 
-struct vtl_socket *vtl_create_socket(int mode, char *ifname, char *err_buf);
+struct vtl_socket *vtl_create_socket(enum vtl_use_mode mode, char *ifname, char *err_buf);
 
 void vtl_close_socket(struct vtl_socket *sock);
 
-void vtl_add_interface(struct vtl_endpoint *endpoint, char *ifname);
+struct vtl_ctx * vtl_init_ctx(enum vtl_use_mode mode, char *ifname, char *err_buf);
+
+void vtl_destroy_ctx(struct vtl_ctx *ctx);
+
+//void vtl_add_interface(struct vtl_endpoint *endpoint, char *ifname);
 
 void vtl_add_ip4(struct vtl_endpoint *endpoint, char *in_addr);
 
 void vtl_add_hostname(struct vtl_endpoint *endpoint, char *hostname);
 
 
-struct vtl_channel *vtl_open_channel(struct vtl_socket *sock, struct vtl_endpoint *local,
+struct vtl_channel *vtl_open_channel(struct vtl_ctx *ctx, struct vtl_endpoint *local,
                                         struct vtl_endpoint *remote, int flags, char *err_buf);
 
 //Temporary
-struct vtl_channel *vtl_accept_channel(struct vtl_socket *sock,
+struct vtl_channel *vtl_accept_channel(struct vtl_ctx *ctx,
                    struct vtl_endpoint *local,
                    struct vtl_endpoint *remote,
                    int flags,
                    char *err_buf);
 
 
-int vtl_send(struct vtl_socket *sock, struct vtl_channel *ch, uint8_t *data, 
+int vtl_send(struct vtl_ctx *ctx, struct vtl_channel *ch, uint8_t *data, 
         size_t datalen, char *err_buf);
 
-void vtl_receive(struct vtl_socket *sock, struct vtl_recv_params *rp);
+void vtl_receive(struct vtl_ctx *ctx, struct vtl_recv_params *rp);
 
 #endif /* __VTL_H */

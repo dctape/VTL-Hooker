@@ -1,7 +1,9 @@
 
-TARGETS := server-stream
-TARGETS += client-stream
-TARGETS += client_perf
+# TARGETS := server-stream
+# TARGETS += client-stream
+# TARGETS += client_perf
+TARGETS := server-aware
+TARGETS += client-aware
 
 OBJS = ${TARGETS:=.o}
 
