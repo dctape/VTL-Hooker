@@ -46,10 +46,7 @@ adaptor__create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 {
       void *packet_buffer;
       uint64_t packet_buffer_size;
-      //struct xsk_umem_info *umem;
-
       struct xsk_socket_info *xsk_socket = NULL;
-
       struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
 
       /* Allow unlimited locking of memory, so all memory needed for packet
@@ -58,7 +55,7 @@ adaptor__create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 	if (setrlimit(RLIMIT_MEMLOCK, &rlim)) {
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
 				strerror(errno));
-		goto bad;
+		goto fail;
 	}
 
         /* Allocate memory for NUM_FRAMES of the default XDP frame size */
@@ -70,7 +67,7 @@ adaptor__create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 			   packet_buffer_size)) {
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: Can't allocate buffer memory \"%s\"\n",
 				strerror(errno));
-		goto bad;
+		goto fail;
 	}
 
         /* Initialize shared packet_buffer for umem usage */
@@ -79,7 +76,7 @@ adaptor__create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: Can't create umem \"%s\"\n",
 				strerror(errno));
-		goto bad;
+		goto fail;
 	}
 
         /* Open and configure the AF_XDP (xsk) socket */
@@ -88,16 +85,14 @@ adaptor__create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
 
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: Can't setup AF_XDP socket \"%s\"\n",
 				strerror(errno));
-		goto bad;
+		goto clean;
 	}
 
         return xsk_socket;
 
-	/* Cleanup */
-bad:
-	//TODO:
-	// xsk_socket__delete(xsk_socket->xsk); // xsk_socket__delete => bpf/xsk
-	// xsk_umem__delete(umem->umem); // xsk_umem__delete => bpf/xsk
+clean: 
+	xsk_umem__delete(umem->umem);
+fail:
 	return NULL;
 }
 

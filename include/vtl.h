@@ -35,6 +35,7 @@ struct vtl_socket {
 
         /* Point d'entrée */
         struct xsk_socket_info *xsk_socket;
+        struct xsk_umem_info umem; 
         bool xsk_poll_mode;
 
         /* Point de sortie */
@@ -85,11 +86,11 @@ struct vtl_sndbuf {
 
         struct vtlhdr vtlh;
         struct ip iphdr;
-        int *ip_flags;
+        int *ip_flags; // allocation mem
         struct ifreq ifr;
         uint8_t *snd_data;
         size_t snd_datalen;
-        uint8_t *snd_packet;
+        uint8_t *snd_packet; //allocation
         
 };
 
@@ -134,6 +135,8 @@ struct vtl_channel *vtl_accept_channel(struct vtl_ctx *ctx,
                    int flags,
                    char *err_buf);
 
+
+void vtl_close_channel(struct vtl_channel *ch);
 
 int vtl_send(struct vtl_ctx *ctx, struct vtl_channel *ch, uint8_t *data, 
         size_t datalen, char *err_buf);

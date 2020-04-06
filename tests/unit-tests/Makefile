@@ -3,7 +3,8 @@ ROOT_DIR = ../../
 TARGETS := test_tc_helpers
 TARGETS += test_xdp_helpers
 TARGETS += test_adaptor
-TARGETS += test_api
+TARGETS += test_util
+# TARGETS += test_api
 
 
 OBJ_DIR = objs
@@ -29,6 +30,7 @@ CFLAGS += -g -Wall -Wextra -Wpedantic \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs 
 CFLAGS += -Wnull-dereference -Wjump-misses-init -Wlogical-op
 CFLAGS += -O2
+CFLAGS += -I$(ROOT_DIR)/include
 CFLAGS += -I$(LIBBPF_DIR)/build/usr/include/ -g
 CFLAGS += -I$(ROOT_DIR)/src/headers/
 CFLAGS += -I$(ROOT_DIR)/src

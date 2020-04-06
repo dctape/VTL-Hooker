@@ -6,13 +6,10 @@
 //TODO: use vtl/if_link.h ??
 #include <linux/if_link.h> // For XDP_FLAGS_MODES
 #include <netinet/ip.h>       // struct ip and IP_MAXPACKET (which is 65535)
+#include <vtl.h>
 
+#include "../../src/adaptor/adaptor.h"
 
-#include "../../src/adaptor/adaptor_receive.h"
-#include "../../src/adaptor/adaptor_send.h"
-
-#include "../../src/common/util.h"
-#include "../../include/vtl/vtl_macros.h"
 
 #define BPF_XDP_FILENAME        "../../src/bpf/bpf_xdp.o"
 
@@ -43,7 +40,6 @@ void test_open_xsk_sock(char *filename, char *ifname, __u32 xdp_flags)
         __u16 xsk_bind_flags = 0;
         xsk_bind_flags &= XDP_ZEROCOPY;
 	xsk_bind_flags |= XDP_COPY;
-
         int xsk_if_queue = 0;
 
         struct xsk_umem_info umem = {0}; // always initialize!!!
@@ -52,10 +48,10 @@ void test_open_xsk_sock(char *filename, char *ifname, __u32 xdp_flags)
         char err_buf[VTL_ERRBUF_SIZE];
 
         struct xsk_socket_info *xsk_socket;
-        xsk_socket = adaptor_create_xsk_sock(ifname, xdp_flags, xsk_bind_flags,
+        xsk_socket = adaptor__create_xsk_sock(ifname, xdp_flags, xsk_bind_flags,
                         xsk_if_queue, &umem, err_buf);
         if (xsk_socket == NULL) {
-                printf("test_open_xsk_sock failed\n");
+                printf("test_open_xsk_sock failed :\n%s \n", err_buf);
                 return;
         }
         printf("open_xsk_sock succeed\n");                
@@ -83,14 +79,14 @@ test_adaptor_send(char* interface, char *target, char *dst_ip, char *src_ip)
         int ret;
         int sock_fd;
         char err_buf[VTL_ERRBUF_SIZE];
-        sock_fd = adaptor_create_raw_sock(AF_INET, IPPROTO_RAW, err_buf);
+        sock_fd = adaptor__create_raw_sock(AF_INET, IPPROTO_RAW, err_buf);
         if (sock_fd < 0) {
                 printf("%s", err_buf);
                 printf("adaptor_create_raw_sock() failed\n");
                 return;
         }
 
-        ret = adaptor_config_raw_sock(sock_fd, interface, err_buf);
+        ret = adaptor__config_raw_sock(sock_fd, interface, err_buf);
         if (ret < 0) {
                 printf("%s", err_buf);
                 printf("adaptor_config_raw_sock() failed\n");
@@ -107,7 +103,7 @@ test_adaptor_send(char* interface, char *target, char *dst_ip, char *src_ip)
 
         char str[] = "TEST";
         strcpy(snd_data, str);
-        ret = adaptor_send_packet(sock_fd, snd_packet, &vtlh, &iphdr,target, dst_ip, 
+        ret = adaptor__send_packet(sock_fd, snd_packet, &vtlh, &iphdr,target, dst_ip, 
                                 src_ip, ip_flags, snd_data, VTL_DATA_SIZE, err_buf);
         
         if (ret != 0) {
@@ -133,11 +129,11 @@ int main(int argc, char const *argv[])
         test_open_xsk_sock(bpf_file, ifname_1, xdp_flags);
         //test_open_xsk_sock(ifname_2);
 
-        char target[] = DST_IP;
-        char dst_ip[] = DST_IP;
-        char src_ip[] = SRC_IP;
+        // char target[] = DST_IP;
+        // char dst_ip[] = DST_IP;
+        // char src_ip[] = SRC_IP;
 
-        test_adaptor_send(ifname_1, target, dst_ip, src_ip);
+        // test_adaptor_send(ifname_1, target, dst_ip, src_ip);
 
         return 0;
 }

@@ -21,16 +21,16 @@
  *  Success xsk_socket or NULL on failure
  **/ 
 static struct xsk_socket_info *
-vtl_create_insock(char *ifname, char *err_buf)
+vtl_sock_in(struct xsk_umem_info *umem,char *ifname, char *err_buf)
 {
         /* af_xdp socket */
         __u32 xdp_flags = 0;
         __u16 xsk_bind_flags = 0;
         int xsk_if_queue = 0;
-        struct xsk_umem_info umem = {0};
 
         struct xsk_socket_info *xsk_socket = NULL;
-
+        
+        //TODO : Put it config file or struct ?
         xdp_flags &= ~XDP_FLAGS_MODES;   /* Clear flags */
         xdp_flags |= XDP_FLAGS_SKB_MODE; /* Set   flag */              
         xsk_bind_flags &= XDP_ZEROCOPY;
@@ -38,7 +38,7 @@ vtl_create_insock(char *ifname, char *err_buf)
 
         //INFO: NIC essentiel pour la création d'un socket af_xdp.
         xsk_socket = adaptor__create_xsk_sock(ifname, xdp_flags, xsk_bind_flags, 
-                                        xsk_if_queue, &umem, err_buf);
+                                        xsk_if_queue, umem, err_buf);
         
         return xsk_socket;
 }
@@ -47,7 +47,7 @@ vtl_create_insock(char *ifname, char *err_buf)
  * >= 0 success ; < 0 failure
  **/ 
 static int
-vtl_create_outsock(char *err_buf)
+vtl_sock_out(char *err_buf)
 {
         return adaptor__create_raw_sock(AF_INET, IPPROTO_RAW, err_buf);
 }
@@ -57,21 +57,18 @@ vtl_create_socket(enum vtl_use_mode mode, char *ifname, char *err_buf)
 {
         struct vtl_socket *sock = NULL;
         sock = malloc(sizeof(struct vtl_socket));
+        sock = calloc(1, sizeof(*sock));
         if (sock == NULL) {
                 snprintf(err_buf, VTL_ERRBUF_SIZE, 
                 "ERR: memory allocation for vtl socket failed\n");
                 return NULL;
         }
-        memset(sock, 0, sizeof(struct vtl_socket));
 
-        //sock->mode = mode;
-
-        /* Socket creation according mode */
         switch (mode) {
         
         case VTL_USE_MODE_INOUT:
         case VTL_USE_MODE_IN :
-                sock->xsk_socket = vtl_create_insock(ifname, err_buf);
+                sock->xsk_socket = vtl_sock_in(&sock->umem, ifname, err_buf);
                 if (sock->xsk_socket == NULL)
                         return NULL;
                 
@@ -79,7 +76,7 @@ vtl_create_socket(enum vtl_use_mode mode, char *ifname, char *err_buf)
                         break;
 
         case VTL_USE_MODE_OUT:
-                sock->af_inet_sock = vtl_create_outsock(err_buf);
+                sock->af_inet_sock = vtl_sock_out(err_buf);
                 if (sock->af_inet_sock < 0)
                         return NULL;
                 break;
@@ -99,11 +96,14 @@ void
 vtl_close_socket(struct vtl_socket *sock)
 {
         // TODO: Select according mode ?
-        if (sock->xsk_socket != NULL)
+        if (sock->xsk_socket != NULL) {
                 xsk_socket__delete(sock->xsk_socket->xsk);
+                xsk_umem__delete(sock->umem.umem);
+
+        }
+                
 
         // TODO: CLose af_inet descriptor
-
         free(sock);
 }
 
@@ -111,12 +111,13 @@ struct vtl_ctx *
 vtl_init_ctx(enum vtl_use_mode mode, char *ifname, char *err_buf)
 {
         struct vtl_ctx *ctx = NULL;
-        ctx = malloc(sizeof(struct vtl_ctx));
+        ctx = calloc(1, sizeof(*ctx));
+
         //TODO: Verify that sizeof(ifname) < sizeof(endpoint->ifname)
         // Signal an error when verification failed 
         strcpy(ctx->ifname, ifname);
         ctx->sock = vtl_create_socket(mode, ifname, err_buf);
-        if (!ctx->sock)
+        if (ctx->sock == NULL)
                 return NULL; // Signaler l'échec de la création de vtl_socket
         
         return ctx;
@@ -125,7 +126,6 @@ vtl_init_ctx(enum vtl_use_mode mode, char *ifname, char *err_buf)
 void
 vtl_destroy_ctx(struct vtl_ctx *ctx)
 {
-        //TODO : test ep
         vtl_close_socket(ctx->sock);
         free(ctx);
 }
@@ -163,7 +163,7 @@ vtl_add_hostname(struct vtl_endpoint *ep, char *hostname)
 
 /*** Fonctions de gestion d'un canal de communication VTL ***/
 
-static void
+static int
 vtl_alloc_buf(struct vtl_channel *ch, enum vtl_use_mode mode)
 {
         // allocation buf according sock type
@@ -171,15 +171,27 @@ vtl_alloc_buf(struct vtl_channel *ch, enum vtl_use_mode mode)
         case VTL_USE_MODE_INOUT:
         case VTL_USE_MODE_IN :
                 ch->rcvbuf->rcv_data = allocate_ustrmem(VTL_DATA_SIZE);
+                if (!ch->rcvbuf->rcv_data)
+                        return -1;
                 if (mode != VTL_USE_MODE_INOUT)
                         break;
         case VTL_USE_MODE_OUT:
                 ch->sndbuf->ip_flags = allocate_intmem(4);
+                if (!ch->sndbuf->ip_flags)
+                        return -1;
+
                 ch->sndbuf->snd_data = allocate_ustrmem(VTL_DATA_SIZE);
+                if (!ch->sndbuf->snd_data)
+                        return -1;
+
                 ch->sndbuf->snd_packet = allocate_ustrmem (IP_MAXPACKET);
+                if (!ch->sndbuf->snd_packet)
+                        return -1;
                 break;
 
         }
+
+        return 0;
 
 }
 struct vtl_channel *
@@ -189,12 +201,15 @@ vtl_open_channel(struct vtl_ctx *ctx,
                 int flags,
                 char *err_buf)
 {
+        //TODO: test allocation
         struct vtl_channel *ch = NULL;
-        ch = malloc(sizeof(struct vtl_channel));
-        memset(ch, 0, sizeof(struct vtl_channel));
+        ch = calloc(1, sizeof(*ch));
+        if (!ch) 
+                goto error_alloc;
+
+        
 
         /** VTL channel preparation **/
-        // Test before assignment
         if (local == NULL && remote == NULL){
                 snprintf(err_buf, VTL_ERRBUF_SIZE,
                 "ERR: Endpoints not correct\n");
@@ -203,25 +218,34 @@ vtl_open_channel(struct vtl_ctx *ctx,
         else if(local == NULL && flags == VTL_LOCAL_AUTOFILL) {
                 //auto fill local endpoint
                 //TODO : get automatically ip src
-                strcpy(local->in_addr, IP_SRC_VM);
+                // strcpy(local->in_addr, IP_SRC_VM);
+                return NULL; 
         }
+        
+        //TODO: Allocate send buffer
         ch->local = local;
         ch->remote = remote;
+        ch->rcvbuf = calloc(1, sizeof(*ch->rcvbuf));
+        if (!ch->rcvbuf)
+                goto error_alloc;
+        
+        ch->rcvbuf->rcv_data = calloc(1,VTL_DATA_SIZE * sizeof(*ch->rcvbuf->rcv_data));        
+        if (!ch->rcvbuf->rcv_data)
+                goto error_alloc;
 
-        // allocation buf according choosen mode
-        vtl_alloc_buf(ch, ctx->mode);
 
         /** vtl negotiation **/
 
         return ch;
 
+error_alloc :
+        snprintf(err_buf, VTL_ERRBUF_SIZE,
+                "ERR: Memory Allocation\n");
+        return NULL;
+
+
 }
 
-// void
-// vtl_close_channel()
-// {
-
-// }
 
 // Puisque nous sommes pour l'instant dans l'incapacité 
 // de faire la négociation.
@@ -241,9 +265,14 @@ vtl_accept_channel(struct vtl_ctx *ctx,
          * 
          **/
 
+        //TODO: test allocation
+        int err;
         struct vtl_channel *ch = NULL;
-        ch = malloc(sizeof(struct vtl_channel));
-        memset(ch, 0, sizeof(struct vtl_channel));
+        ch = calloc(1, sizeof(*ch));
+        if (!ch)
+                goto error_alloc;
+
+        
 
         // Test before assignment
         if (local == NULL && remote == NULL){
@@ -254,16 +283,76 @@ vtl_accept_channel(struct vtl_ctx *ctx,
         else if(local == NULL && flags == VTL_LOCAL_AUTOFILL) {
                 //auto fill local endpoint
                 //TODO : get automatically ip src
-                strcpy(local->in_addr, IP_SRC_VM);
+                // strcpy(local->in_addr, IP_SRC_VM);
+                return NULL;
         }
+        
         ch->local = local;
         ch->remote = remote;
 
-        // allocation buf according sock type
-        vtl_alloc_buf(ch, ctx->mode); 
+        ch->sndbuf = calloc(1, sizeof(struct vtl_sndbuf));
+        if (!ch->sndbuf) {
+                snprintf(err_buf, VTL_ERRBUF_SIZE,
+                "ERR: ch->sndbuf  memory allocation failed\n");
+                return NULL;
+        }
 
+
+        ch->sndbuf->ip_flags = calloc(1, 4 * sizeof(*ch->sndbuf->ip_flags));
+        if (!ch->sndbuf->ip_flags) {
+                snprintf(err_buf, VTL_ERRBUF_SIZE,
+                "ERR: ch->sndbuf->ip_flags  memory allocation failed\n");
+                return NULL;
+
+        }
+
+
+        ch->sndbuf->snd_data = calloc (1, VTL_DATA_SIZE * sizeof(*ch->sndbuf->snd_data));
+        if (!ch->sndbuf->snd_data) {
+                snprintf(err_buf, VTL_ERRBUF_SIZE,
+                "ERR: ch->sndbuf->snd_data  memory allocation failed\n");
+                return NULL;
+
+        }
+
+        ch->sndbuf->snd_packet = calloc(1,IP_MAXPACKET * sizeof(*ch->sndbuf->snd_packet));
+        if (!ch->sndbuf->snd_packet) {
+                snprintf(err_buf, VTL_ERRBUF_SIZE,
+                "ERR: ch->sndbuf->snd_packet  memory allocation failed\n");
+                return NULL;
+
+        }
+  
         return ch;
 
+error_alloc :
+        snprintf(err_buf, VTL_ERRBUF_SIZE,
+                "ERR: Memory Allocation\n");
+        return NULL;
+
+}
+
+void
+vtl_close_channel(struct vtl_channel *ch)
+{
+        if (!ch)
+                return;
+        if (ch->rcvbuf) {
+                if (ch->rcvbuf->rcv_data)
+                        free(ch->rcvbuf->rcv_data);
+                free(ch->rcvbuf); 
+        }
+                
+        if (ch->sndbuf) {
+                if (ch->sndbuf->ip_flags)
+                        free(ch->sndbuf->ip_flags);
+                if (ch->sndbuf->snd_data)
+                        free(ch->sndbuf->snd_data);
+                if (ch->sndbuf->snd_packet)
+                        free(ch->sndbuf->snd_packet);
+                free(ch->sndbuf);
+        }
+        free(ch);
 }
 
 /*** Fonctions d'émission et de réception ***/

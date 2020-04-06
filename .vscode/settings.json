@@ -30,6 +30,8 @@
                 "util.h": "c",
                 "bpf_endian.h": "c",
                 "bpf_helpers.h": "c",
-                "adapter.h": "c"
+                "adapter.h": "c",
+                "stdlib.h": "c",
+                "string.h": "c"
         }
 }
