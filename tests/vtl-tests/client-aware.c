@@ -12,12 +12,12 @@
 #include <vtl.h>
 
 #define IP_CLIENT          "192.168.43.151"
-#define IP_SERVER          "192.168.43.15"
+#define IP_SERVER          "192.168.43.153"
 
 void 
 print_data(void *ctx, uint8_t *data, uint32_t data_size)
 {
-        printf("From server: %s", data);
+        printf("From server: %s\n", data);
 
 }
 
@@ -40,7 +40,7 @@ int main(int argc, char const *argv[])
         struct vtl_channel *ch;
 
         /* Global shutdown handler */
-	signal(SIGINT, exit_application);
+	//signal(SIGINT, exit_application);
 
         /* Initiate vtl context */
         printf("Initiate vtl context\n");
@@ -67,10 +67,11 @@ int main(int argc, char const *argv[])
         printf("Waiting data\n");
         struct vtl_recv_params rp = {
                 .recv_cb = print_data,
+                .global_exit = false,
         };
-        global_exit = false;
-        while (!global_exit)
-                vtl_receive(ctx, &rp);
+        // global_exit = false;
+        // while (!global_exit)
+        vtl_receive(ctx, &rp);
 
 close :        
         /* Destroy vtl context after use */

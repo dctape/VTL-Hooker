@@ -108,6 +108,7 @@ typedef void (*vtl_recv_cb)(void *ctx, uint8_t *data, uint32_t data_size);
 struct vtl_recv_params {
         vtl_recv_cb recv_cb;
         void *ctx;
+        bool global_exit;
 };
 
 struct vtl_socket *vtl_create_socket(enum vtl_use_mode mode, char *ifname, char *err_buf);

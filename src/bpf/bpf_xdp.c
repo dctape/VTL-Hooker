@@ -9,7 +9,6 @@
 
 #include "../../include/vtl_kern.h"
 
-
 struct bpf_map_def SEC("maps") xsks_map = {
     .type = BPF_MAP_TYPE_XSKMAP,
     .key_size = sizeof(int),

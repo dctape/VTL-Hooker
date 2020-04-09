@@ -32,6 +32,7 @@
                 "bpf_helpers.h": "c",
                 "adapter.h": "c",
                 "stdlib.h": "c",
-                "string.h": "c"
+                "string.h": "c",
+                "adaptor.h": "c"
         }
 }

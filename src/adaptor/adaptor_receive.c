@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <bpf/xsk.h> // ajouter libbpf lors de la compilation
+#include <bpf/xsk.h>	// ajouter libbpf lors de la compilation
 #include <bpf/libbpf.h> // perf_event functions
 
 #include <sys/resource.h>
@@ -24,97 +24,102 @@
 #include "../../src/common/xsk_user_helpers.h"
 #include "adaptor.h"
 
-#define RX_BATCH_SIZE      		64
+#define RX_BATCH_SIZE 64
 
-void *alloc(size_t size)  /* extern ??*/
+void *alloc(size_t size) /* extern ??*/
 {
-  void *new_mem;
-  if((new_mem = malloc(size)) == NULL)
-  {
-    printf("Out of memory!\n");
-    //exit(1);
-     return NULL;
-  }
-  return new_mem;
+	void *new_mem;
+	if ((new_mem = malloc(size)) == NULL)
+	{
+		printf("Out of memory!\n");
+		//exit(1);
+		return NULL;
+	}
+	return new_mem;
 }
 
-#define MALLOC(type,num) (type *)alloc((num) * sizeof(type))
+#define MALLOC(type, num) (type *)alloc((num) * sizeof(type))
 
 struct xsk_socket_info *
 adaptor__create_xsk_sock(char *ifname, __u32 xdp_flags, __u16 xsk_bind_flags,
-			int xsk_if_queue, struct xsk_umem_info *umem, char *err_buf)
+			 int xsk_if_queue, struct xsk_umem_info *umem, char *err_buf)
 {
-      void *packet_buffer;
-      uint64_t packet_buffer_size;
-      struct xsk_socket_info *xsk_socket = NULL;
-      struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
+	void *packet_buffer;
+	uint64_t packet_buffer_size;
+	struct xsk_socket_info *xsk_socket = NULL;
+	struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
 
-      /* Allow unlimited locking of memory, so all memory needed for packet
+	/* Allow unlimited locking of memory, so all memory needed for packet
 	 * buffers can be locked.
 	 */
-	if (setrlimit(RLIMIT_MEMLOCK, &rlim)) {
+	if (setrlimit(RLIMIT_MEMLOCK, &rlim))
+	{
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: setrlimit(RLIMIT_MEMLOCK) \"%s\"\n",
-				strerror(errno));
+			 strerror(errno));
 		goto fail;
 	}
 
-        /* Allocate memory for NUM_FRAMES of the default XDP frame size */
+	/* Allocate memory for NUM_FRAMES of the default XDP frame size */
 	// getpagesize: obtenir des pages mémoires du système
 	packet_buffer_size = NUM_FRAMES * FRAME_SIZE;
 
-        if (posix_memalign(&packet_buffer,
+	if (posix_memalign(&packet_buffer,
 			   getpagesize(), /* PAGE_SIZE aligned */
-			   packet_buffer_size)) {
+			   packet_buffer_size))
+	{
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: Can't allocate buffer memory \"%s\"\n",
-				strerror(errno));
+			 strerror(errno));
 		goto fail;
 	}
 
-        /* Initialize shared packet_buffer for umem usage */
+	/* Initialize shared packet_buffer for umem usage */
 	umem = configure_xsk_umem(packet_buffer, packet_buffer_size);
-	if (umem == NULL) {
+	if (umem == NULL)
+	{
 
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: Can't create umem \"%s\"\n",
-				strerror(errno));
+			 strerror(errno));
 		goto fail;
 	}
 
-        /* Open and configure the AF_XDP (xsk) socket */
+	/* Open and configure the AF_XDP (xsk) socket */
 	xsk_socket = xsk_configure_socket(ifname, xdp_flags, xsk_bind_flags, xsk_if_queue, umem);
-	if (xsk_socket == NULL) {
+	if (xsk_socket == NULL)
+	{
 
 		snprintf(err_buf, VTL_ERRBUF_SIZE, "ERROR: Can't setup AF_XDP socket \"%s\"\n",
-				strerror(errno));
+			 strerror(errno));
 		goto clean;
 	}
 
-        return xsk_socket;
+	return xsk_socket;
 
-clean: 
+clean:
 	xsk_umem__delete(umem->umem);
 fail:
 	return NULL;
 }
 
-static bool 
-process_packet(struct xsk_socket_info *xsk, 
-		uint64_t addr, uint32_t len, 
-		struct vtl_recv_params *rp)
-{	
+static bool
+process_packet(struct xsk_socket_info *xsk,
+	       uint64_t addr, uint32_t len,
+	       struct vtl_recv_params *rp)
+{
 	uint32_t hdr_size;
 	uint32_t data_size;
 
 	/* Parsing */
-	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);	
-	struct ethhdr *eth = (struct ethhdr *) pkt;
+	uint8_t *pkt = xsk_umem__get_data(xsk->umem->buffer, addr);
+	struct ethhdr *eth = (struct ethhdr *)pkt;
 	struct iphdr *iph = (struct iphdr *)(eth + 1);
 	vtlhdr_t *vtlh = (vtlhdr_t *)(iph + 1);
-	uint8_t *data = (uint8_t*)(vtlh + 1); 
+	uint8_t *data = (uint8_t *)(vtlh + 1);
 
 	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(vtlhdr_t);
 	data_size = len - hdr_size;
 
-	/* Call callback function */	
+	printf("Data in process_packet: %s", data);
+	/* Call callback function */
 	if (rp->recv_cb)
 		rp->recv_cb(rp->ctx, data, data_size);
 
@@ -122,23 +127,28 @@ process_packet(struct xsk_socket_info *xsk,
 }
 
 //TODO: Improve this
-static void 
-handle_receive_packets(struct xsk_socket_info *xsk, 
-			struct vtl_recv_params *rp)
+static void
+handle_receive_packets(struct xsk_socket_info *xsk,
+		       struct vtl_recv_params *rp)
 {
+
 	unsigned int rcvd, stock_frames, i;
 	uint32_t idx_rx = 0, idx_fq = 0;
 	int ret;
+
 
 	rcvd = xsk_ring_cons__peek(&xsk->rx, RX_BATCH_SIZE, &idx_rx);
 	if (!rcvd)
 		return;
 
+	//printf("handle packets\n");
+
 	/* Stuff the ring with as much frames as possible */
 	stock_frames = xsk_prod_nb_free(&xsk->umem->fq,
 					xsk_umem_free_frames(xsk));
 
-	if (stock_frames > 0) {
+	if (stock_frames > 0)
+	{
 
 		ret = xsk_ring_prod__reserve(&xsk->umem->fq, stock_frames,
 					     &idx_fq);
@@ -151,13 +161,14 @@ handle_receive_packets(struct xsk_socket_info *xsk,
 
 		for (i = 0; i < stock_frames; i++)
 			*xsk_ring_prod__fill_addr(&xsk->umem->fq, idx_fq++) =
-				xsk_alloc_umem_frame(xsk);
+			    xsk_alloc_umem_frame(xsk);
 
 		xsk_ring_prod__submit(&xsk->umem->fq, stock_frames);
 	}
 
 	/* Process received packets */
-	for (i = 0; i < rcvd; i++) {
+	for (i = 0; i < rcvd; i++)
+	{;
 		uint64_t addr = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx)->addr;
 		uint32_t len = xsk_ring_cons__rx_desc(&xsk->rx, idx_rx++)->len;
 
@@ -168,6 +179,7 @@ handle_receive_packets(struct xsk_socket_info *xsk,
 	}
 
 	xsk_ring_cons__release(&xsk->rx, rcvd);
+
 	//xsk->stats.rx_packets += rcvd; //TODO : Est-ce nécessaire ??
 
 	/* Do we need to wake up the kernel for transmission */
@@ -175,10 +187,9 @@ handle_receive_packets(struct xsk_socket_info *xsk,
 }
 
 //TODO: Revoir le code de retour
-void 
-adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
-		struct vtl_recv_params *rp)
-{	
+void adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
+		       struct vtl_recv_params *rp)
+{
 	// Pas trop bien compris...
 	struct pollfd fds[2];
 	int ret, nfds = 1;
@@ -188,15 +199,17 @@ adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 	fds[0].events = POLLIN;
 
 	//TODO: revenir sur le xsk_poll_mode
-	if (xsk_poll_mode){
-	
+	if (xsk_poll_mode)
+	{
+
 		ret = poll(fds, nfds, -1);
 		if (ret <= 0 || ret > 1)
-			return; 
+			return;
 	}
-		
+
 	handle_receive_packets(xsk_socket, rp);
-	
+
+	//printf("adaptor_rcv_data\n");
 }
 
 /****** reception through perf_event buffer *******/
@@ -204,7 +217,7 @@ adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 // #define SAMPLE_SIZE	1530
 
 // // Enfiler
-// static void 
+// static void
 // enqueue(struct perf_rcv_data_list *list, struct perf_rcv_data *frag)
 // {
 // 	if( list->first == NULL &&  list->last == NULL) {
@@ -221,7 +234,7 @@ adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 
 // // défiler
 // static struct perf_rcv_data *
-// dequeue(struct perf_rcv_data_list *list) 
+// dequeue(struct perf_rcv_data_list *list)
 // {
 // 	struct perf_rcv_data *frag;
 // 	frag = list->first;
@@ -234,11 +247,11 @@ adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 // }
 
 // // perf_event callback function
-// static void 
+// static void
 // handle_perf_recv_pkts(void *ctx, int cpu, void *data, __u32 size)
 // {
 // 	vtl_md_t *vtl_md = (vtl_md_t *)ctx;
-// 	struct perf_rcv_data *rcv_data; 
+// 	struct perf_rcv_data *rcv_data;
 // 	struct {
 // 		__u16 cookie;
 // 		__u16 pkt_len;
@@ -256,7 +269,7 @@ adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 // 	struct ethhdr *eth = (struct ethhdr *)e->pkt_data;
 //         struct iphdr *iph = (struct iphdr *)(eth + 1);
 // 	vtlhdr_t *vtlh = (vtlhdr_t *)(iph + 1);
-// 	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr) 
+// 	hdr_size = sizeof(struct ethhdr) + sizeof(struct iphdr)
 // 			+ sizeof(vtlhdr_t);
 // 	data_size = e->pkt_len - hdr_size;
 
@@ -274,17 +287,17 @@ adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 
 // // thread function
 // // TODO: Est-ce possible d'avoir de meilleurs codes d'erreur
-// static void * 
+// static void *
 // thread_function (void *args)
 // {
 // 	int err, ret;
 // 	struct perf_buffer_opts pb_opts = {0};
-// 	vtl_md_t *vtl_md = (vtl_md_t *)args; 
+// 	vtl_md_t *vtl_md = (vtl_md_t *)args;
 
 // 	pb_opts.sample_cb = handle_perf_recv_pkts;
 // 	pb_opts.ctx = vtl_md;
 
-// 	vtl_md->pb = perf_buffer__new(vtl_md->perf_map_fd, 8, &pb_opts); // Pourquoi 8 ?	
+// 	vtl_md->pb = perf_buffer__new(vtl_md->perf_map_fd, 8, &pb_opts); // Pourquoi 8 ?
 // 	err = libbpf_get_error(vtl_md->pb);
 // 	if (err) {
 // 		perror("perf_buffer setup failed");
@@ -298,11 +311,11 @@ adaptor__rcv_data(struct xsk_socket_info *xsk_socket, bool xsk_poll_mode,
 
 // }
 
-// int 
+// int
 // adaptor__listen_thread(vtl_md_t *vtl_md)
 // {
 // 	int ret;
-// 	ret = pthread_create(&vtl_md->rcv_thread, NULL, thread_function, 
+// 	ret = pthread_create(&vtl_md->rcv_thread, NULL, thread_function,
 // 			(void *)vtl_md);
 // 	if (ret != 0) {
 // 		perror("ERR: thread creation failed");

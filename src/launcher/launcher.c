@@ -155,6 +155,7 @@ launcher__deploy_xdp_xsk(struct xdp_config *cfg, const char *bpf_file, char *ifn
 		return -1;
 	}
 
+        /* Vérifie que la map xsk est bien chargé dans le noyau */
         struct bpf_map *map = NULL;
         map = bpf_object__find_map_by_name(bpf_obj, "xsks_map");
         int xsks_map_fd = bpf_map__fd(map);
